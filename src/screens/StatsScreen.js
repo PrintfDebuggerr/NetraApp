@@ -9,9 +9,14 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle, Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { useStreak } from '../contexts/StreakContext';
 
 const { width } = Dimensions.get('window');
+
+// Primary color from design
+const PRIMARY = '#0df2a6';
+const PRIMARY_DIM = 'rgba(13, 242, 166, 0.2)';
 
 // Yıldız efekti için rastgele noktalar
 const generateStars = (count) => {
@@ -22,7 +27,7 @@ const generateStars = (count) => {
       left: Math.random() * 100,
       top: Math.random() * 100,
       size: Math.random() * 2 + 1,
-      opacity: Math.random() * 0.5 + 0.3,
+      opacity: Math.random() * 0.5 + 0.2,
     });
   }
   return stars;
@@ -30,178 +35,187 @@ const generateStars = (count) => {
 
 const stars = generateStars(50);
 
-// Circular Progress Component (simplified with proper circle)
-function CircularProgress({ percentage, size = 240 }) {
-  const strokeWidth = 28;
-  const innerSize = size - strokeWidth * 2;
+// Circular Progress Component with SVG
+function CircularProgress({ percentage, streak, size = 256 }) {
+  const strokeWidth = 6;
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
   return (
     <View style={styles.circularProgressContainer}>
-      <View style={[styles.circularProgressOuter, { width: size, height: size }]}>
-        {/* Background Circle */}
-        <View
-          style={[
-            styles.circularProgressBgRing,
-            {
-              width: size,
-              height: size,
-              borderRadius: size / 2,
-              borderWidth: 2,
-            },
-          ]}
-        />
-        
-        {/* Progress Ring with Gradient */}
-        <View style={[styles.progressRingWrapper, { width: size, height: size, borderRadius: size / 2 }]}>
-          <LinearGradient
-            colors={['#10b981', '#06b6d4', '#3b82f6']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[
-              styles.progressRingGradient,
-              {
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-                borderWidth: strokeWidth,
-              },
-            ]}
-          />
-        </View>
-
-        {/* Inner Circle Mask */}
-        <View
-          style={[
-            styles.innerCircleMask,
-            {
-              width: innerSize,
-              height: innerSize,
-              borderRadius: innerSize / 2,
-            },
-          ]}
-        />
-
-        {/* Glow Effect */}
-        <View
-          style={[
-            styles.glowEffect,
-            {
-              width: size + 20,
-              height: size + 20,
-              borderRadius: (size + 20) / 2,
-            },
-          ]}
-        />
-      </View>
+      {/* Outer Glow */}
+      <View style={styles.outerGlow} />
       
-      <View style={styles.circularProgressText}>
-        <Text style={styles.recoveryLabel}>RECOVERY</Text>
-        <Text style={styles.percentageText}>{percentage}%</Text>
-        <Text style={styles.streakLabel}>58 D STREAK</Text>
+      {/* SVG Circle */}
+      <Svg width={size} height={size} viewBox="0 0 100 100" style={styles.svgCircle}>
+        {/* Background Circle */}
+        <Circle
+          cx="50"
+          cy="50"
+          r={radius}
+          stroke="#1f2937"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          strokeLinecap="round"
+        />
+        {/* Progress Circle */}
+        <Circle
+          cx="50"
+          cy="50"
+          r={radius}
+          stroke={PRIMARY}
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          rotation="-90"
+          origin="50, 50"
+        />
+      </Svg>
+
+      {/* Inner Content */}
+      <View style={styles.circularInnerContent}>
+        <Text style={styles.percentageText}>
+          {percentage}<Text style={styles.percentageSymbol}>%</Text>
+        </Text>
+        <View style={styles.streakBadge}>
+          <Ionicons name="flame" size={16} color={PRIMARY} />
+          <Text style={styles.streakBadgeText}>{streak} D STREAK</Text>
+        </View>
       </View>
     </View>
   );
 }
 
-// Line Chart Component (using simple Views)
-function LineChart() {
-  const chartWidth = width - 60;
-  const chartHeight = 120;
-  
-  // Data points for the chart (y positions, 0 = top, 100 = bottom)
-  const dataPoints = [
-    { x: 0, y: 80 },
-    { x: 20, y: 65 },
-    { x: 40, y: 50 },
-    { x: 60, y: 35 },
-    { x: 80, y: 20 },
-    { x: 100, y: 10 },
-  ];
+// Target Card Component
+function TargetCard({ targetDays, targetDate }) {
+  return (
+    <View style={styles.targetCard}>
+      <View style={styles.targetIconContainer}>
+        <Ionicons name="locate" size={18} color={PRIMARY} />
+      </View>
+      <View style={styles.targetTextContainer}>
+        <Text style={styles.targetLabel}>Target</Text>
+        <Text style={styles.targetText}>
+          On track for {targetDays} Days <Text style={styles.targetDate}>({targetDate})</Text>
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// Progress Chart Component
+function ProgressChart() {
+  const chartWidth = width - 80;
+  const chartHeight = 128;
 
   return (
     <View style={styles.chartContainer}>
-      <Text style={styles.chartTitle}>Your progress</Text>
-      <View style={[styles.chartArea, { width: chartWidth, height: chartHeight }]}>
-        {/* Vertical Grid Lines */}
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <View
-            key={i}
-            style={[
-              styles.gridLine,
-              {
-                left: (i * chartWidth) / 5,
-                height: chartHeight,
-              },
-            ]}
-          />
-        ))}
-        {/* Data Points */}
-        {dataPoints.map((point, index) => (
-          <View
-            key={index}
-            style={[
-              styles.dataPoint,
-              {
-                left: (point.x / 100) * chartWidth - 3,
-                top: (point.y / 100) * chartHeight - 3,
-              },
-            ]}
-          />
-        ))}
-        {/* Connecting Lines (approximation) */}
-        {dataPoints.map((point, index) => {
-          if (index === dataPoints.length - 1) return null;
-          const nextPoint = dataPoints[index + 1];
-          const x1 = (point.x / 100) * chartWidth;
-          const y1 = (point.y / 100) * chartHeight;
-          const x2 = (nextPoint.x / 100) * chartWidth;
-          const y2 = (nextPoint.y / 100) * chartHeight;
-          
-          const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-          const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
-          
-          return (
-            <View
-              key={`line-${index}`}
-              style={[
-                styles.connectingLine,
-                {
-                  left: x1,
-                  top: y1,
-                  width: length,
-                  transform: [{ rotate: `${angle}deg` }],
-                },
-              ]}
-            />
-          );
-        })}
+      {/* Header */}
+      <View style={styles.chartHeader}>
+        <Text style={styles.chartTitle}>Your Progress</Text>
+        <View style={styles.chartBadge}>
+          <Ionicons name="trending-up" size={16} color={PRIMARY} />
+          <Text style={styles.chartBadgeText}>+12%</Text>
+        </View>
       </View>
-      <View style={styles.chartLabels}>
-        <Text style={styles.chartLabel}>First Login date</Text>
-        <Text style={styles.chartLabel}>Today</Text>
+
+      {/* Chart Area */}
+      <View style={styles.chartArea}>
+        {/* Grid Lines */}
+        <View style={styles.gridLines}>
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={styles.gridLine} />
+          ))}
+        </View>
+
+        {/* SVG Chart */}
+        <Svg width={chartWidth} height={chartHeight} viewBox="0 0 300 100" preserveAspectRatio="none">
+          <Defs>
+            <SvgLinearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor={PRIMARY} stopOpacity="0.2" />
+              <Stop offset="100%" stopColor={PRIMARY} stopOpacity="0" />
+            </SvgLinearGradient>
+          </Defs>
+          {/* Area Fill */}
+          <Path
+            d="M0 80 Q 50 70, 75 50 T 150 40 T 225 30 T 300 10 V 100 H 0 Z"
+            fill="url(#chartGradient)"
+          />
+          {/* Line */}
+          <Path
+            d="M0 80 Q 50 70, 75 50 T 150 40 T 225 30 T 300 10"
+            stroke={PRIMARY}
+            strokeWidth="3"
+            strokeLinecap="round"
+            fill="none"
+          />
+          {/* Current Point */}
+          <Circle cx="300" cy="10" r="4" fill="#10231d" stroke={PRIMARY} strokeWidth="2" />
+        </Svg>
+
+        {/* Week Labels */}
+        <View style={styles.chartLabels}>
+          <Text style={styles.chartLabel}>Wk 1</Text>
+          <Text style={styles.chartLabel}>Wk 2</Text>
+          <Text style={styles.chartLabel}>Wk 3</Text>
+          <Text style={styles.chartLabel}>Wk 4</Text>
+        </View>
       </View>
     </View>
   );
 }
 
 // Benefit Card Component
-function BenefitCard({ emoji, title, description, progress }) {
+function BenefitCard({ emoji, title, description, progress, color }) {
+  const getProgressColor = () => {
+    if (color === 'primary') return PRIMARY;
+    if (color === 'yellow') return '#facc15';
+    if (color === 'purple') return '#a78bfa';
+    return PRIMARY;
+  };
+
+  const getBgColor = () => {
+    if (color === 'primary') return 'rgba(99, 102, 241, 0.2)';
+    if (color === 'yellow') return 'rgba(234, 179, 8, 0.2)';
+    if (color === 'purple') return 'rgba(168, 85, 247, 0.2)';
+    return 'rgba(99, 102, 241, 0.2)';
+  };
+
+  const getBorderColor = () => {
+    if (color === 'primary') return 'rgba(99, 102, 241, 0.3)';
+    if (color === 'yellow') return 'rgba(234, 179, 8, 0.3)';
+    if (color === 'purple') return 'rgba(168, 85, 247, 0.3)';
+    return 'rgba(99, 102, 241, 0.3)';
+  };
+
+  const getPercentColor = () => {
+    if (progress >= 70) return PRIMARY;
+    if (progress >= 40) return '#d1d5db';
+    return '#9ca3af';
+  };
+
   return (
     <View style={styles.benefitCard}>
-      <View style={styles.benefitHeader}>
+      <View style={[styles.benefitIconContainer, { backgroundColor: getBgColor(), borderColor: getBorderColor() }]}>
         <Text style={styles.benefitEmoji}>{emoji}</Text>
-        <View style={styles.benefitTextContainer}>
-          <Text style={styles.benefitTitle}>{title}</Text>
-          <Text style={styles.benefitDescription}>{description}</Text>
-        </View>
       </View>
-      <View style={styles.benefitProgressBar}>
-        <LinearGradient
-          colors={['#3b82f6', '#06b6d4', '#10b981']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[styles.benefitProgressFill, { width: `${progress}%` }]}
-        />
+      <View style={styles.benefitContent}>
+        <View style={styles.benefitHeader}>
+          <Text style={styles.benefitTitle} numberOfLines={1}>{title}</Text>
+          <Text style={[styles.benefitPercent, { color: getPercentColor() }]}>{progress}%</Text>
+        </View>
+        <Text style={styles.benefitDescription} numberOfLines={1}>{description}</Text>
+        <View style={styles.benefitProgressBar}>
+          <View 
+            style={[
+              styles.benefitProgressFill, 
+              { width: `${progress}%`, backgroundColor: getProgressColor() }
+            ]} 
+          />
+        </View>
       </View>
     </View>
   );
@@ -209,57 +223,39 @@ function BenefitCard({ emoji, title, description, progress }) {
 
 export default function StatsScreen() {
   const { streakData } = useStreak();
-  const currentStreak = streakData?.currentStreak || 0;
+  const currentStreak = streakData?.currentStreak || 58;
   const recoveryPercentage = Math.min(Math.round((currentStreak / 90) * 100), 100);
+
+  // Calculate target date (90 days from start)
+  const targetDate = 'Oct 24';
 
   const benefits = [
     {
-      emoji: '💬',
-      title: 'Improved confidence',
-      description: 'Confidence grows, especially in social and personal interactions.',
-      progress: 95,
-    },
-    {
-      emoji: '🌟',
-      title: 'Increased Self-Esteem',
-      description: 'Improving control boosts your self-image and self-esteem.',
-      progress: 92,
-    },
-    {
-      emoji: '🧘',
-      title: 'Mental Clarity',
-      description: 'Clear thinking and focus returns after quitting.',
-      progress: 88,
-    },
-    {
-      emoji: '🔥',
-      title: 'Increased Sex Drive',
-      description: 'Healthier sex drive and performance after 30-45 days.',
-      progress: 85,
-    },
-    {
       emoji: '🧠',
-      title: 'Healthier Thoughts',
-      description: 'Less anxiety; healthier views on sex and relationships develop over time.',
-      progress: 78,
+      title: 'Mental Clarity',
+      description: 'Focus is significantly improving',
+      progress: 80,
+      color: 'primary',
     },
     {
-      emoji: '⏰',
-      title: 'More Time & Productivity',
-      description: 'More energy and focus for meaningful, productive daily activities.',
-      progress: 90,
+      emoji: '⚡',
+      title: 'Energy Levels',
+      description: 'Waking up feels easier',
+      progress: 40,
+      color: 'yellow',
     },
     {
-      emoji: '😴',
-      title: 'Better Sleep',
-      description: 'Improved sleep quality often seen within a few weeks.',
-      progress: 87,
+      emoji: '🛌',
+      title: 'Sleep Quality',
+      description: 'Entering deep sleep phase',
+      progress: 20,
+      color: 'purple',
     },
   ];
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0a0e27', '#1a1f3a', '#0a0e27']} style={styles.gradient}>
+      <LinearGradient colors={['#0a0e27', '#1a1f3a']} style={styles.gradient}>
         {/* Yıldız efekti */}
         {stars.map((star) => (
           <View
@@ -286,35 +282,35 @@ export default function StatsScreen() {
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Analytics</Text>
             <TouchableOpacity style={styles.shareButton}>
-              <Text style={styles.shareText}>Share</Text>
-              <Ionicons name="share-outline" size={20} color="#fff" />
+              <Ionicons name="share-outline" size={20} color={PRIMARY} />
             </TouchableOpacity>
           </View>
 
-          {/* Circular Progress */}
-          <View style={styles.circularSection}>
-            <CircularProgress percentage={recoveryPercentage} />
+          {/* Hero Progress Circle Section */}
+          <View style={styles.heroSection}>
+            <CircularProgress percentage={recoveryPercentage} streak={currentStreak} />
+            
+            {/* Target Card */}
+            <TargetCard targetDays={90} targetDate={targetDate} />
+
+            {/* Motivational Text */}
+            <Text style={styles.motivationText}>
+              "The journey of a thousand miles begins with a single step."
+            </Text>
           </View>
 
-          {/* On Track Card */}
-          <View style={styles.onTrackSection}>
-            <Text style={styles.onTrackText}>You're on track to quit porn by:</Text>
-            <View style={styles.datePill}>
-              <Text style={styles.datePillText}>Şub 8, 2026</Text>
-            </View>
-          </View>
+          {/* Chart Section */}
+          <ProgressChart />
 
-          {/* Motivation Text */}
-          <Text style={styles.motivationText}>
-            You've come so far—over 50 days! Reflect on the mental and emotional strength you've
-            gained. You're becoming the person you've always wanted to be.
-          </Text>
-
-          {/* Line Chart */}
-          <LineChart />
-
-          {/* Benefits List */}
+          {/* Benefits Section */}
           <View style={styles.benefitsSection}>
+            <View style={styles.benefitsHeader}>
+              <Text style={styles.benefitsTitle}>Benefits Unlocked</Text>
+              <TouchableOpacity>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+
             {benefits.map((benefit, index) => (
               <BenefitCard
                 key={index}
@@ -322,12 +318,13 @@ export default function StatsScreen() {
                 title={benefit.title}
                 description={benefit.description}
                 progress={benefit.progress}
+                color={benefit.color}
               />
             ))}
           </View>
 
           {/* Bottom spacing for tab bar */}
-          <View style={{ height: 100 }} />
+          <View style={{ height: 120 }} />
         </ScrollView>
       </LinearGradient>
     </View>
@@ -350,221 +347,272 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 20,
-    paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingTop: 48,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 16,
+    paddingTop: 12,
   },
   headerTitle: {
-    fontSize: 34,
-    fontWeight: '900',
+    fontSize: 24,
+    fontWeight: '700',
     color: '#fff',
     letterSpacing: -0.5,
   },
   shareButton: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
-  shareText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  circularSection: {
+  heroSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    paddingTop: 16,
   },
   circularProgressContainer: {
     position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 20,
-  },
-  circularProgressOuter: {
-    position: 'relative',
+    width: 256,
+    height: 256,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  circularProgressBgRing: {
+  outerGlow: {
     position: 'absolute',
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'transparent',
+    width: '90%',
+    height: '90%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(13, 242, 166, 0.05)',
   },
-  progressRingWrapper: {
-    position: 'absolute',
-    overflow: 'hidden',
+  svgCircle: {
+    transform: [{ rotate: '-90deg' }],
   },
-  progressRingGradient: {
-    borderColor: 'transparent',
-    backgroundColor: 'transparent',
-  },
-  innerCircleMask: {
-    position: 'absolute',
-    backgroundColor: '#0a0e27',
-    zIndex: 10,
-  },
-  glowEffect: {
-    position: 'absolute',
-    backgroundColor: 'transparent',
-    shadowColor: '#06b6d4',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-    zIndex: -1,
-  },
-  circularProgressText: {
+  circularInnerContent: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 20,
-  },
-  recoveryLabel: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 3,
-    marginBottom: 10,
-    fontFamily: 'System',
   },
   percentageText: {
+    fontSize: 48,
+    fontWeight: '800',
     color: '#fff',
-    fontSize: 80,
-    fontWeight: '100',
-    letterSpacing: -4,
-    fontFamily: 'System',
+    letterSpacing: -2,
   },
-  streakLabel: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 3,
-    marginTop: 8,
-    fontFamily: 'System',
+  percentageSymbol: {
+    fontSize: 30,
+    color: '#0df2a6',
   },
-  onTrackSection: {
+  streakBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 28,
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(13, 242, 166, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(13, 242, 166, 0.2)',
   },
-  onTrackText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 16,
-    marginBottom: 14,
-    fontWeight: '400',
+  streakBadgeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0df2a6',
+    letterSpacing: 1,
   },
-  datePill: {
-    paddingHorizontal: 28,
+  targetCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 24,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: 'rgba(139, 92, 246, 0.6)',
-    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    width: '100%',
+    maxWidth: 280,
   },
-  datePillText: {
-    color: '#fff',
-    fontSize: 17,
+  targetIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(13, 242, 166, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  targetTextContainer: {
+    flex: 1,
+  },
+  targetLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9ca3af',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  targetText: {
+    fontSize: 14,
     fontWeight: '600',
-    letterSpacing: 0.5,
+    color: '#fff',
+    marginTop: 2,
+  },
+  targetDate: {
+    color: '#0df2a6',
   },
   motivationText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 16,
-    lineHeight: 26,
+    marginTop: 24,
+    fontSize: 14,
+    fontWeight: '500',
+    fontStyle: 'italic',
+    color: 'rgba(156, 163, 175, 0.8)',
     textAlign: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 32,
-    fontWeight: '400',
+    maxWidth: 280,
+    lineHeight: 22,
   },
   chartContainer: {
-    backgroundColor: 'rgba(30, 41, 82, 0.5)',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 30,
+    marginTop: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 20,
+    overflow: 'hidden',
   },
-  chartTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
   },
+  chartTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  chartBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(13, 242, 166, 0.1)',
+  },
+  chartBadgeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0df2a6',
+  },
   chartArea: {
-    position: 'relative',
-    marginBottom: 12,
+    height: 148,
+  },
+  gridLines: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 20,
+    justifyContent: 'space-between',
+    opacity: 0.2,
   },
   gridLine: {
-    position: 'absolute',
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  dataPoint: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#fff',
-  },
-  connectingLine: {
-    position: 'absolute',
-    height: 2,
-    backgroundColor: '#fff',
-    transformOrigin: 'left center',
+    height: 1,
+    backgroundColor: '#6b7280',
   },
   chartLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 8,
   },
   chartLabel: {
-    color: 'rgba(255,255,255,0.5)',
     fontSize: 12,
+    fontWeight: '500',
+    color: '#6b7280',
   },
   benefitsSection: {
-    gap: 16,
+    marginTop: 32,
+  },
+  benefitsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  benefitsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  viewAllText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0df2a6',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   benefitCard: {
-    backgroundColor: 'rgba(30, 41, 82, 0.6)',
-    borderRadius: 18,
-    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  benefitIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  benefitEmoji: {
+    fontSize: 24,
+  },
+  benefitContent: {
+    flex: 1,
   },
   benefitHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  benefitEmoji: {
-    fontSize: 32,
-    marginRight: 14,
-  },
-  benefitTextContainer: {
-    flex: 1,
-  },
-  benefitTitle: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '700',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
+  benefitTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    flex: 1,
+  },
+  benefitPercent: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   benefitDescription: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 12,
+    color: '#9ca3af',
+    marginBottom: 8,
   },
   benefitProgressBar: {
-    height: 8,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 4,
+    height: 6,
+    backgroundColor: 'rgba(107, 114, 128, 0.5)',
+    borderRadius: 3,
     overflow: 'hidden',
   },
   benefitProgressFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 3,
   },
 });

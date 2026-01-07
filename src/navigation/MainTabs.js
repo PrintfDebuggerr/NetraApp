@@ -4,15 +4,11 @@ import { View, StyleSheet } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import StatsScreen from '../screens/StatsScreen';
+import LibraryScreen from '../screens/LibraryScreen';
 import FeedStack from './FeedStack';
 import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
-
-// Placeholder screen for Journal tab
-function JournalScreen() {
-  return <View style={{ flex: 1, backgroundColor: '#0a0e27' }} />;
-}
 
 function TabIcon({ name, focused }) {
   const iconColor = focused ? '#fff' : 'rgba(255,255,255,0.4)';
@@ -21,7 +17,7 @@ function TabIcon({ name, focused }) {
   const icons = {
     Home: <Ionicons name="grid" size={iconSize} color={iconColor} />,
     Stats: <Ionicons name="bar-chart" size={iconSize} color={iconColor} />,
-    Journal: <MaterialCommunityIcons name="bookmark-outline" size={iconSize} color={iconColor} />,
+    Library: <Ionicons name="library-outline" size={iconSize} color={iconColor} />,
     Feed: <Ionicons name="chatbubble-outline" size={iconSize} color={iconColor} />,
     Profile: <Feather name="menu" size={iconSize} color={iconColor} />,
   };
@@ -54,8 +50,8 @@ export default function MainTabs() {
         component={StatsScreen}
       />
       <Tab.Screen 
-        name="Journal" 
-        component={JournalScreen}
+        name="Library" 
+        component={LibraryScreen}
       />
       <Tab.Screen 
         name="Feed" 
