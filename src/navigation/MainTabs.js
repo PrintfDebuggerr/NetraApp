@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
-import HomeScreen from '../screens/HomeScreen';
+import HomeStack from './HomeStack';
 import StatsScreen from '../screens/StatsScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import FeedStack from './FeedStack';
@@ -43,7 +43,7 @@ export default function MainTabs() {
     >
       <Tab.Screen 
         name="Home" 
-        component={HomeScreen}
+        component={HomeStack}
       />
       <Tab.Screen 
         name="Stats" 

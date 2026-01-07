@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStreak } from '../contexts/StreakContext';
 import PanicModal from '../components/PanicModal';
+import { getCurrentBadge } from '../utils/badgeData';
 
 const { width } = Dimensions.get('window');
 
@@ -78,11 +79,12 @@ function ActionButton({ icon, label, color, onPress }) {
   );
 }
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const { streakData, timer, brainRewiring } = useStreak();
   const [showPanicModal, setShowPanicModal] = useState(false);
 
   const currentStreak = streakData?.currentStreak || 35;
+  const currentBadge = getCurrentBadge(currentStreak);
 
   // Get week days based on current day
   const getWeekDays = () => {
@@ -159,16 +161,38 @@ export default function HomeScreen() {
             ))}
           </View>
 
-          {/* Main Medal Circle */}
-          <View style={styles.medalContainer}>
+          {/* Main Medal Circle - Tıklanabilir */}
+          <TouchableOpacity 
+            style={styles.medalContainer}
+            onPress={() => navigation.navigate('Achievements')}
+            activeOpacity={0.8}
+          >
             <View style={styles.medalGlow} />
-            <View style={styles.medalRing}>
-              <View style={styles.medalInner}>
+            <LinearGradient
+              colors={currentBadge.colors}
+              style={styles.medalRing}
+            >
+              <View style={[styles.medalInner, { backgroundColor: currentBadge.bgColor }]}>
                 <View style={styles.medalInnerBorder} />
-                <MaterialCommunityIcons name="medal" size={80} color="#9ca3af" style={styles.medalIcon} />
+                <View style={styles.medalShine} />
+                {currentBadge.iconType === 'material' ? (
+                  <MaterialCommunityIcons 
+                    name={currentBadge.icon} 
+                    size={80} 
+                    color={currentBadge.iconColor} 
+                    style={styles.medalIcon} 
+                  />
+                ) : (
+                  <Ionicons 
+                    name={currentBadge.icon} 
+                    size={80} 
+                    color={currentBadge.iconColor} 
+                    style={styles.medalIcon} 
+                  />
+                )}
               </View>
-            </View>
-          </View>
+            </LinearGradient>
+          </TouchableOpacity>
 
           {/* Timer Info */}
           <View style={styles.timerInfo}>
@@ -433,6 +457,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 20,
     elevation: 10,
+    overflow: 'hidden',
   },
   medalInnerBorder: {
     position: 'absolute',
@@ -445,8 +470,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.05)',
     opacity: 0.3,
   },
+  medalShine: {
+    position: 'absolute',
+    top: -70,
+    left: -70,
+    width: 180,
+    height: 180,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 90,
+    transform: [{ rotate: '45deg' }],
+  },
   medalIcon: {
     opacity: 0.9,
+    zIndex: 10,
   },
   timerInfo: {
     alignItems: 'center',
