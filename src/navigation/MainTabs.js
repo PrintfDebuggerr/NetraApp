@@ -1,24 +1,34 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
+import StatsScreen from '../screens/StatsScreen';
 import FeedStack from './FeedStack';
 import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
+// Placeholder screen for Journal tab
+function JournalScreen() {
+  return <View style={{ flex: 1, backgroundColor: '#0a0e27' }} />;
+}
+
 function TabIcon({ name, focused }) {
+  const iconColor = focused ? '#fff' : 'rgba(255,255,255,0.4)';
+  const iconSize = 24;
+
   const icons = {
-    Home: '🏠',
-    Feed: '💬',
-    Profile: '👤',
+    Home: <Ionicons name="grid" size={iconSize} color={iconColor} />,
+    Stats: <Ionicons name="bar-chart" size={iconSize} color={iconColor} />,
+    Journal: <MaterialCommunityIcons name="bookmark-outline" size={iconSize} color={iconColor} />,
+    Feed: <Ionicons name="chatbubble-outline" size={iconSize} color={iconColor} />,
+    Profile: <Feather name="menu" size={iconSize} color={iconColor} />,
   };
 
   return (
     <View style={styles.tabIconContainer}>
-      <Text style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-        {icons[name]}
-      </Text>
+      {icons[name]}
     </View>
   );
 }
@@ -29,9 +39,7 @@ export default function MainTabs() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: '#e94560',
-        tabBarInactiveTintColor: '#666',
-        tabBarLabelStyle: styles.tabLabel,
+        tabBarShowLabel: false,
         tabBarIcon: ({ focused }) => (
           <TabIcon name={route.name} focused={focused} />
         ),
@@ -40,17 +48,22 @@ export default function MainTabs() {
       <Tab.Screen 
         name="Home" 
         component={HomeScreen}
-        options={{ tabBarLabel: 'Ana Sayfa' }}
+      />
+      <Tab.Screen 
+        name="Stats" 
+        component={StatsScreen}
+      />
+      <Tab.Screen 
+        name="Journal" 
+        component={JournalScreen}
       />
       <Tab.Screen 
         name="Feed" 
         component={FeedStack}
-        options={{ tabBarLabel: 'Topluluk' }}
       />
       <Tab.Screen 
         name="Profile" 
         component={ProfileScreen}
-        options={{ tabBarLabel: 'Profil' }}
       />
     </Tab.Navigator>
   );
@@ -58,26 +71,19 @@ export default function MainTabs() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#0f0f23',
-    borderTopColor: '#1a1a2e',
+    backgroundColor: '#0a0e27',
+    borderTopColor: 'rgba(255,255,255,0.1)',
     borderTopWidth: 1,
-    height: 70,
-    paddingBottom: 10,
-    paddingTop: 10,
-  },
-  tabLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    height: 80,
+    paddingBottom: 20,
+    paddingTop: 15,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   tabIconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  tabIcon: {
-    fontSize: 22,
-    opacity: 0.6,
-  },
-  tabIconFocused: {
-    opacity: 1,
   },
 });
