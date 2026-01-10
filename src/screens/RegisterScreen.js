@@ -16,6 +16,7 @@ import { validateEmail, validatePassword, getAuthErrorMessage } from '../utils/a
 
 export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,13 +27,18 @@ export default function RegisterScreen({ navigation }) {
   const handleRegister = async () => {
     setError('');
 
-    if (!email || !password || !confirmPassword) {
+    if (!email || !username || !password || !confirmPassword) {
       setError('Lütfen tüm alanları doldurun');
       return;
     }
 
     if (!validateEmail(email)) {
       setError('Geçersiz email adresi');
+      return;
+    }
+
+    if (username.length < 3) {
+      setError('Kullanıcı adı en az 3 karakter olmalı');
       return;
     }
 
@@ -47,14 +53,14 @@ export default function RegisterScreen({ navigation }) {
     }
 
     setLoading(true);
-    const result = await register(email, password);
+    const result = await register(email, password, username);
     setLoading(false);
 
     if (!result.success) {
       const errorMessage = getAuthErrorMessage(result.error);
       setError(errorMessage);
     } else {
-      Alert.alert('Başarılı', 'Hesabın oluşturuldu!');
+      navigation.navigate('Verification', { email: result.email, password: password, username: username });
     }
   };
 
@@ -78,6 +84,16 @@ export default function RegisterScreen({ navigation }) {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Kullanıcı Adı (min 3 karakter)"
+              placeholderTextColor="#999"
+              value={username}
+              onChangeText={(text) => setUsername(text)}
+              autoCapitalize="none"
+              autoCorrect={false}
             />
 
             <TextInput

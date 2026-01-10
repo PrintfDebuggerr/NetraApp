@@ -65,7 +65,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit }) {
           <TextInput
             style={styles.input}
             placeholder="Ne düşünüyorsun?"
-            placeholderTextColor="#666"
+            placeholderTextColor="#9ca3af"
             value={content}
             onChangeText={(text) => setContent(text)}
             multiline={true}
@@ -102,11 +102,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modal: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#162035',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
     minHeight: 300,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(13, 242, 166, 0.2)',
   },
   header: {
     flexDirection: 'row',
@@ -121,18 +123,18 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     fontSize: 20,
-    color: '#666',
+    color: '#9ca3af',
     padding: 5,
   },
   input: {
-    backgroundColor: '#16213e',
+    backgroundColor: '#1a2642',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     color: '#fff',
     minHeight: 120,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: 'rgba(13, 242, 166, 0.2)',
   },
   footer: {
     flexDirection: 'row',
@@ -141,14 +143,19 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   charCount: {
-    color: '#666',
+    color: '#9ca3af',
     fontSize: 13,
   },
   submitButton: {
-    backgroundColor: '#e94560',
+    backgroundColor: '#0df2a6',
     borderRadius: 20,
     paddingVertical: 12,
     paddingHorizontal: 30,
+    shadowColor: '#0df2a6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
   },
   submitButtonDisabled: {
     opacity: 0.6,

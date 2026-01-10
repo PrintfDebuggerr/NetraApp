@@ -125,9 +125,6 @@ export default function HomeScreen({ navigation }) {
           />
         ))}
 
-        {/* Blue glow effect */}
-        <View style={styles.blueGlow} />
-
         <ScrollView 
           style={styles.scrollView} 
           contentContainerStyle={styles.content}
@@ -178,14 +175,14 @@ export default function HomeScreen({ navigation }) {
                 {currentBadge.iconType === 'material' ? (
                   <MaterialCommunityIcons 
                     name={currentBadge.icon} 
-                    size={80} 
+                    size={70} 
                     color={currentBadge.iconColor} 
                     style={styles.medalIcon} 
                   />
                 ) : (
                   <Ionicons 
                     name={currentBadge.icon} 
-                    size={80} 
+                    size={70} 
                     color={currentBadge.iconColor} 
                     style={styles.medalIcon} 
                   />
@@ -288,17 +285,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     backgroundColor: '#fff',
     borderRadius: 10,
-  },
-  blueGlow: {
-    position: 'absolute',
-    top: '25%',
-    left: '50%',
-    marginLeft: -160,
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: 'rgba(13, 242, 166, 0.08)',
-    transform: [{ translateY: -160 }],
   },
   scrollView: {
     flex: 1,
@@ -421,32 +407,32 @@ const styles = StyleSheet.create({
   medalContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12,
   },
   medalGlow: {
     position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
     backgroundColor: 'rgba(13, 242, 166, 0.15)',
   },
   medalRing: {
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    padding: 6,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    padding: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
+    shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.9,
-    shadowRadius: 30,
-    elevation: 15,
+    shadowRadius: 28,
+    elevation: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     backgroundColor: '#4b5563',
   },
   medalInner: {
     flex: 1,
-    borderRadius: 120,
+    borderRadius: 110,
     backgroundColor: '#1a1a2e',
     justifyContent: 'center',
     alignItems: 'center',
@@ -455,29 +441,29 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 1,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowRadius: 18,
+    elevation: 9,
     overflow: 'hidden',
   },
   medalInnerBorder: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    right: 12,
-    bottom: 12,
-    borderRadius: 120,
+    top: 11,
+    left: 11,
+    right: 11,
+    bottom: 11,
+    borderRadius: 110,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
     opacity: 0.3,
   },
   medalShine: {
     position: 'absolute',
-    top: -70,
-    left: -70,
-    width: 180,
-    height: 180,
+    top: -65,
+    left: -65,
+    width: 165,
+    height: 165,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 90,
+    borderRadius: 82,
     transform: [{ rotate: '45deg' }],
   },
   medalIcon: {
@@ -486,7 +472,7 @@ const styles = StyleSheet.create({
   },
   timerInfo: {
     alignItems: 'center',
-    marginTop: 32,
+    marginTop: 20,
     paddingHorizontal: 16,
   },
   timerLabel: {
@@ -502,13 +488,13 @@ const styles = StyleSheet.create({
   },
   timerValue: {
     color: '#fff',
-    fontSize: 60,
+    fontSize: 56,
     fontWeight: '900',
     letterSpacing: -2,
   },
   timerUnit: {
     color: '#6b7280',
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '400',
     marginLeft: 4,
   },
@@ -516,8 +502,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 20,
-    paddingHorizontal: 20,
+    marginTop: 16,
+    paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: '#0f1522',
@@ -533,7 +519,7 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 32,
+    marginTop: 20,
     paddingHorizontal: 0,
   },
   actionButton: {
