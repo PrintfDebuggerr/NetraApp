@@ -1,41 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users - sadece kendi verisini okuyup yazabilir
+    // Users - only owner can read/write their own data
     match /users/{userId} {
-      // Kendi verisini okuyabilir
-      allow get: if request.auth != null && request.auth.uid == userId;
-      // Kayıt sırasında email kontrolü için collection query izni
-      allow list: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Streaks - giriş yapmış kullanıcılar okuyup yazabilir
-    match /streaks/{streakId} {
-      allow read, write: if request.auth != null;
+
+    // Streaks - only owner can read/write their own data
+    match /streaks/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Posts - herkes okuyabilir, sadece sahibi düzenleyebilir
+
+    // Posts - authenticated users can read all, only owner can modify
     match /posts/{postId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
-    
-    // Comments - herkes okuyabilir, sadece sahibi düzenleyebilir
+
+    // Comments - authenticated users can read all, only owner can modify
     match /comments/{commentId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-    }
-    
-    // Email Verifications - email doğrulama için
-    match /emailVerifications/{userId} {
-      // Herkes okuyabilir, oluşturabilir ve güncelleyebilir (verification flow için)
-      allow read, create, update: if true;
-      
-      // Sadece sahibi silebilir
-      allow delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

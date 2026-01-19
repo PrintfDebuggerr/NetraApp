@@ -1,32 +1,50 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
+import {
+  signInWithCredential,
+  GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged
 } from 'firebase/auth';
 import { auth, db } from '../../config/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { sendVerificationEmail, generateVerificationCode } from '../services/emailService';
-import { saveVerificationCode, verifyCode, isEmailVerified, checkEmailExists } from '../services/verificationService';
+import * as WebBrowser from 'expo-web-browser';
+import * as Crypto from 'expo-crypto';
+import * as Linking from 'expo-linking';
 
 const AuthContext = createContext({});
+
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [authError, setAuthError] = useState(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
+  // Use the Expo Go scheme for redirect
+  const redirectUri = Linking.createURL('auth');
+
+  console.log('🔗 Redirect URI:', redirectUri);
+
+  // Firebase auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('🔥 Firebase auth state:', firebaseUser?.email || 'null');
+
       if (firebaseUser) {
-        const verificationResult = await isEmailVerified(firebaseUser.uid);
-        if (verificationResult.verified) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          setIsNewUser(!userDoc.exists());
           setUser(firebaseUser);
-        } else {
-          setUser(null);
+        } catch (error) {
+          console.error('Error checking user doc:', error);
+          setUser(firebaseUser);
+          setIsNewUser(true);
         }
       } else {
         setUser(null);
+        setIsNewUser(false);
       }
       setLoading(false);
     });
@@ -34,69 +52,126 @@ export const AuthProvider = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  const register = async (email, password, username) => {
+  // Generate random string for nonce/state
+  const generateRandomString = (length = 32) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  const signInWithGoogle = async () => {
+    console.log('🚀 signInWithGoogle called');
+    setAuthError(null);
+    setGoogleLoading(true);
+
     try {
-      const emailCheck = await checkEmailExists(email);
-      if (!emailCheck.success) {
-        return { success: false, error: 'Email kontrolü yapılamadı' };
-      }
-      if (emailCheck.exists) {
-        return { success: false, error: 'Bu email adresi zaten kullanılıyor' };
-      }
+      const state = generateRandomString(16);
+      const nonce = generateRandomString(32);
 
-      const verificationCode = generateVerificationCode();
-      await saveVerificationCode(email, password, username, verificationCode);
-      
-      const emailResult = await sendVerificationEmail(email, verificationCode);
-      if (!emailResult.success) {
-        return { success: false, error: 'Email gönderilemedi. Lütfen tekrar deneyin.' };
-      }
+      // Build Google OAuth URL directly
+      const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      googleAuthUrl.searchParams.set('client_id', GOOGLE_WEB_CLIENT_ID);
+      googleAuthUrl.searchParams.set('redirect_uri', redirectUri);
+      googleAuthUrl.searchParams.set('response_type', 'id_token');
+      googleAuthUrl.searchParams.set('scope', 'openid profile email');
+      googleAuthUrl.searchParams.set('state', state);
+      googleAuthUrl.searchParams.set('nonce', nonce);
 
-      return { success: true, email: email };
+      console.log('📤 Opening auth URL:', googleAuthUrl.toString());
+
+      const result = await WebBrowser.openAuthSessionAsync(
+        googleAuthUrl.toString(),
+        redirectUri
+      );
+
+      console.log('📥 WebBrowser result:', JSON.stringify(result, null, 2));
+
+      if (result.type === 'success') {
+        const url = result.url;
+        console.log('✅ Got redirect URL:', url);
+
+        // Parse the URL to get id_token from fragment
+        const fragmentString = url.split('#')[1];
+        if (fragmentString) {
+          const params = new URLSearchParams(fragmentString);
+          const idToken = params.get('id_token');
+          const returnedState = params.get('state');
+
+          console.log('🎫 Got id_token:', !!idToken);
+          console.log('🔐 State matches:', state === returnedState);
+
+          if (idToken) {
+            await signInWithIdToken(idToken);
+          } else {
+            setAuthError('id_token bulunamadı');
+            setGoogleLoading(false);
+          }
+        } else {
+          console.error('❌ No fragment in URL');
+          setAuthError('Token alınamadı');
+          setGoogleLoading(false);
+        }
+      } else if (result.type === 'cancel' || result.type === 'dismiss') {
+        console.log('ℹ️ User cancelled');
+        setGoogleLoading(false);
+      } else {
+        console.error('❌ Unexpected result:', result);
+        setAuthError('Giriş başarısız');
+        setGoogleLoading(false);
+      }
     } catch (error) {
-      return { success: false, error: error.message };
+      console.error('❌ Auth error:', error);
+      setAuthError(error.message);
+      setGoogleLoading(false);
     }
   };
 
-  const completeRegistration = async (email, password, username) => {
+  const signInWithIdToken = async (idToken) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const userId = userCredential.user.uid;
+      console.log('🔐 Signing into Firebase...');
 
-      await setDoc(doc(db, 'users', userId), {
-        email: email,
-        username: username,
+      const credential = GoogleAuthProvider.credential(idToken);
+      const result = await signInWithCredential(auth, credential);
+
+      console.log('✅ Firebase sign-in successful:', result.user.email);
+
+      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+      setIsNewUser(!userDoc.exists());
+      setGoogleLoading(false);
+    } catch (error) {
+      console.error('❌ Firebase error:', error.code, error.message);
+      setAuthError(error.message);
+      setGoogleLoading(false);
+    }
+  };
+
+  const completeProfile = async (username) => {
+    if (!user) return { success: false, error: 'NO_USER' };
+
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        email: user.email,
+        username,
+        displayName: user.displayName || null,
+        photoURL: user.photoURL || null,
         createdAt: new Date(),
         emailVerified: true,
         verifiedAt: new Date(),
       });
 
-      await setDoc(doc(db, 'streaks', userId), {
-        userId: userId,
+      await setDoc(doc(db, 'streaks', user.uid), {
+        userId: user.uid,
         currentStreak: 0,
         longestStreak: 0,
         lastCheckDate: new Date(),
         startDate: new Date(),
-        relapses: 0
+        relapses: 0,
       });
 
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  };
-
-  const login = async (email, password) => {
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userId = userCredential.user.uid;
-      
-      const verificationResult = await isEmailVerified(userId);
-      if (!verificationResult.verified) {
-        await firebaseSignOut(auth);
-        return { success: false, error: 'EMAIL_NOT_VERIFIED', userId: userId, email: email };
-      }
-      
+      setIsNewUser(false);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -106,47 +181,25 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
+      setIsNewUser(false);
       return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  };
-
-  const resendVerificationEmail = async (email, password, username) => {
-    try {
-      const verificationCode = generateVerificationCode();
-      await saveVerificationCode(email, password, username, verificationCode);
-      
-      const emailResult = await sendVerificationEmail(email, verificationCode);
-      if (!emailResult.success) {
-        return { success: false, error: 'Email gönderilemedi. Lütfen tekrar deneyin.' };
-      }
-      
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  };
-
-  const verifyEmailCode = async (email, code) => {
-    try {
-      const result = await verifyCode(email, code);
-      return result;
     } catch (error) {
       return { success: false, error: error.message };
     }
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      register, 
-      completeRegistration,
-      login, 
-      logout, 
-      resendVerificationEmail, 
-      verifyEmailCode 
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      isNewUser,
+      authError,
+      googleLoading,
+      googleAuthReady: true,
+      signInWithGoogle,
+      completeProfile,
+      logout,
+      clearAuthError: () => setAuthError(null),
     }}>
       {children}
     </AuthContext.Provider>
