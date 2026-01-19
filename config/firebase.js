@@ -2,21 +2,20 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// Firebase configuration
+// Firebase configuration using environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyDr34lxeDwj9xIqntfpKrtFx29gZ1mAPQk",
-  authDomain: "netra-49c2c.firebaseapp.com",
-  projectId: "netra-49c2c",
-  storageBucket: "netra-49c2c.firebasestorage.app",
-  messagingSenderId: "342525427220",
-  appId: "1:342525427220:web:ff22e84c6ed5252731f101",
-  measurementId: "G-MFQFD4GF14"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Authentication (without custom persistence for Expo Go compatibility)
+// Initialize Firebase Authentication
 export const auth = getAuth(app);
 
 // Initialize Firestore
