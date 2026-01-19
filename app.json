@@ -21,6 +21,12 @@
       },
       "edgeToEdgeEnabled": true
     },
+    "extra": {
+      "googleExpoClientId": "",
+      "googleIosClientId": "",
+      "googleAndroidClientId": "",
+      "googleWebClientId": ""
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     }

@@ -3,7 +3,9 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signOut as firebaseSignOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithCredential
 } from 'firebase/auth';
 import { auth, db } from '../../config/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -86,6 +88,49 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const ensureUserProfile = async (firebaseUser) => {
+    const userId = firebaseUser.uid;
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    const username = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User';
+
+    if (!userDoc.exists()) {
+      await setDoc(userRef, {
+        email: firebaseUser.email,
+        username,
+        createdAt: new Date(),
+        emailVerified: true,
+        verifiedAt: new Date(),
+      });
+    } else if (!userDoc.data().emailVerified) {
+      await setDoc(userRef, { emailVerified: true, verifiedAt: new Date() }, { merge: true });
+    }
+
+    const streakRef = doc(db, 'streaks', userId);
+    const streakDoc = await getDoc(streakRef);
+    if (!streakDoc.exists()) {
+      await setDoc(streakRef, {
+        userId,
+        currentStreak: 0,
+        longestStreak: 0,
+        lastCheckDate: new Date(),
+        startDate: new Date(),
+        relapses: 0,
+      });
+    }
+  };
+
+  const loginWithGoogle = async (idToken) => {
+    try {
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      await ensureUserProfile(userCredential.user);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
   const login = async (email, password) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -143,6 +188,7 @@ export const AuthProvider = ({ children }) => {
       loading, 
       register, 
       completeRegistration,
+      loginWithGoogle,
       login, 
       logout, 
       resendVerificationEmail, 
