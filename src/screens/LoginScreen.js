@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import { useAuth } from '../contexts/AuthContext';
 import { validateEmail, getAuthErrorMessage } from '../utils/authHelpers';
+import { getGoogleAuthConfig } from '../utils/googleAuthConfig';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -19,7 +23,23 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const googleConfig = useMemo(() => getGoogleAuthConfig(), []);
+  const hasGoogleConfig = Boolean(
+    googleConfig.expoClientId ||
+      googleConfig.iosClientId ||
+      googleConfig.androidClientId ||
+      googleConfig.webClientId
+  );
+
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: googleConfig.expoClientId || undefined,
+    iosClientId: googleConfig.iosClientId || undefined,
+    androidClientId: googleConfig.androidClientId || undefined,
+    webClientId: googleConfig.webClientId || undefined,
+    prompt: 'select_account',
+  });
 
   const handleLogin = async () => {
     setError('');
@@ -43,6 +63,46 @@ export default function LoginScreen({ navigation }) {
       setError(errorMessage);
     }
   };
+
+  useEffect(() => {
+    const runGoogleLogin = async () => {
+      if (response?.type !== 'success') return;
+
+      const idToken = response.params?.id_token;
+      if (!idToken) {
+        setError('Google oturumu açılamadı. Lütfen tekrar deneyin.');
+        return;
+      }
+
+      setGoogleLoading(true);
+      const result = await loginWithGoogle(idToken);
+      setGoogleLoading(false);
+
+      if (!result.success) {
+        const errorMessage = getAuthErrorMessage(result.error);
+        setError(errorMessage);
+      }
+    };
+
+    runGoogleLogin();
+  }, [response, loginWithGoogle]);
+
+  const handleGoogleLogin = async () => {
+    setError('');
+
+    if (!hasGoogleConfig) {
+      setError('Google giriş ayarları eksik. Lütfen client ID bilgilerini ekleyin.');
+      return;
+    }
+
+    try {
+      await promptAsync();
+    } catch (error) {
+      setError(getAuthErrorMessage(error?.message || error));
+    }
+  };
+
+  const isGoogleDisabled = googleLoading || !hasGoogleConfig || !request;
 
   return (
     <KeyboardAvoidingView
@@ -87,6 +147,24 @@ export default function LoginScreen({ navigation }) {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.buttonText}>Giriş Yap</Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>veya</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.googleButton, isGoogleDisabled && styles.buttonDisabled]}
+            onPress={handleGoogleLogin}
+            disabled={isGoogleDisabled}
+          >
+            {googleLoading ? (
+              <ActivityIndicator color="#1a1a2e" />
+            ) : (
+              <Text style={styles.googleButtonText}>Google ile devam et</Text>
             )}
           </TouchableOpacity>
 
@@ -156,6 +234,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  googleButton: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#e94560',
+  },
+  googleButtonText: {
+    color: '#1a1a2e',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   linkButton: {
     marginTop: 20,
     alignItems: 'center',
@@ -173,5 +265,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 10,
     textAlign: 'center',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#0f3460',
+  },
+  dividerText: {
+    color: '#999',
+    marginHorizontal: 12,
   },
 });
