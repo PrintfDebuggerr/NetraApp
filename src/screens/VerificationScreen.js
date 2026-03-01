@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function VerificationScreen({ navigation, route }) {
-  const { email, password, username } = route.params || {};
+  const { email, username } = route.params || {};
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
@@ -56,18 +56,17 @@ export default function VerificationScreen({ navigation, route }) {
   };
 
   const handleVerifyCode = async (fullCode) => {
-    if (!email || !password || !username) {
+    if (!email || !username) {
       Alert.alert('Hata', 'Kullanıcı bilgisi bulunamadı');
       return;
     }
 
     setLoading(true);
     const verifyResult = await verifyEmailCode(email, fullCode);
-    
+
     if (verifyResult.success) {
       const registrationResult = await completeRegistration(
         verifyResult.data.email,
-        verifyResult.data.password,
         verifyResult.data.username
       );
       
@@ -92,13 +91,13 @@ export default function VerificationScreen({ navigation, route }) {
 
   const handleResendCode = async () => {
     if (countdown > 0) return;
-    if (!email || !password || !username) {
+    if (!email || !username) {
       Alert.alert('Hata', 'Kullanıcı bilgisi bulunamadı');
       return;
     }
 
     setResendLoading(true);
-    const result = await resendVerificationEmail(email, password, username);
+    const result = await resendVerificationEmail(email, username);
     setResendLoading(false);
 
     if (result.success) {

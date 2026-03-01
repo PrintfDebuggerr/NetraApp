@@ -1,4 +1,4 @@
-const RESEND_API_KEY = 're_du9hpDNn_73kJxUh1irY5wNN7YzE2X6DM';
+const RESEND_API_KEY = process.env.EXPO_PUBLIC_RESEND_API_KEY;
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
 export const sendVerificationEmail = async (email, code) => {

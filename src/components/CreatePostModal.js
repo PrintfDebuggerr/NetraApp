@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,16 @@ import {
   Platform,
 } from 'react-native';
 
+const POST_TYPES = [
+  { key: 'Victory', label: '🏆 Victory', color: '#4ade80', bg: 'rgba(34,197,94,0.15)', border: 'rgba(34,197,94,0.3)' },
+  { key: 'Vent',    label: '😤 Vent',    color: '#f87171', bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.3)' },
+  { key: 'Tips',    label: '💡 Tips',    color: '#60a5fa', bg: 'rgba(59,130,246,0.15)', border: 'rgba(59,130,246,0.3)' },
+  { key: 'Relapse', label: '🔄 Relapse', color: '#94a3b8', bg: 'rgba(100,116,139,0.15)',border: 'rgba(100,116,139,0.3)' },
+];
+
 export default function CreatePostModal({ visible, onClose, onSubmit }) {
   const [content, setContent] = useState('');
+  const [selectedType, setSelectedType] = useState('Tips');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -29,8 +37,9 @@ export default function CreatePostModal({ visible, onClose, onSubmit }) {
 
     setLoading(true);
     try {
-      await onSubmit(content.trim());
+      await onSubmit(content.trim(), selectedType);
       setContent('');
+      setSelectedType('Tips');
       onClose();
     } catch (error) {
       Alert.alert('Hata', 'Post gönderilemedi. Lütfen tekrar dene.');
@@ -40,6 +49,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit }) {
 
   const handleClose = () => {
     setContent('');
+    setSelectedType('Tips');
     onClose();
   };
 
@@ -60,6 +70,29 @@ export default function CreatePostModal({ visible, onClose, onSubmit }) {
             <TouchableOpacity onPress={handleClose}>
               <Text style={styles.closeButton}>✕</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Post Tipi Seçici */}
+          <View style={styles.typeRow}>
+            {POST_TYPES.map((t) => {
+              const isActive = selectedType === t.key;
+              return (
+                <TouchableOpacity
+                  key={t.key}
+                  style={[
+                    styles.typeChip,
+                    { backgroundColor: t.bg, borderColor: isActive ? t.color : t.border },
+                    isActive && styles.typeChipActive,
+                  ]}
+                  onPress={() => setSelectedType(t.key)}
+                  disabled={loading}
+                >
+                  <Text style={[styles.typeChipText, { color: isActive ? t.color : '#9ca3af' }]}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           <TextInput
@@ -106,7 +139,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    minHeight: 300,
     borderTopWidth: 1,
     borderTopColor: 'rgba(13, 242, 166, 0.2)',
   },
@@ -114,7 +146,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   title: {
     fontSize: 18,
@@ -125,6 +157,25 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#9ca3af',
     padding: 5,
+  },
+  typeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  typeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  typeChipActive: {
+    borderWidth: 1.5,
+  },
+  typeChipText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   input: {
     backgroundColor: '#1a2642',

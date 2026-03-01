@@ -221,34 +221,43 @@ function BenefitCard({ emoji, title, description, progress, color }) {
   );
 }
 
+function getTargetDate(streakData) {
+  if (!streakData?.startDate) return 'N/A';
+  const start = streakData.startDate instanceof Date
+    ? streakData.startDate
+    : streakData.startDate.toDate?.() || new Date(streakData.startDate);
+  const target = new Date(start);
+  target.setDate(target.getDate() + 90);
+  return target.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export default function StatsScreen() {
   const { streakData } = useStreak();
-  const currentStreak = streakData?.currentStreak || 58;
+  const currentStreak = streakData?.currentStreak || 0;
   const recoveryPercentage = Math.min(Math.round((currentStreak / 90) * 100), 100);
 
-  // Calculate target date (90 days from start)
-  const targetDate = 'Oct 24';
+  const targetDate = getTargetDate(streakData);
 
   const benefits = [
     {
       emoji: '🧠',
       title: 'Mental Clarity',
       description: 'Focus is significantly improving',
-      progress: 80,
+      progress: Math.min(Math.round((currentStreak / 30) * 100), 100),
       color: 'primary',
     },
     {
       emoji: '⚡',
       title: 'Energy Levels',
       description: 'Waking up feels easier',
-      progress: 40,
+      progress: Math.min(Math.round((currentStreak / 45) * 100), 100),
       color: 'yellow',
     },
     {
       emoji: '🛌',
       title: 'Sleep Quality',
       description: 'Entering deep sleep phase',
-      progress: 20,
+      progress: Math.min(Math.round((currentStreak / 60) * 100), 100),
       color: 'purple',
     },
   ];

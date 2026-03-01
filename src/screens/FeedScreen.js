@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useStreak } from '../contexts/StreakContext';
 import CreatePostModal from '../components/CreatePostModal';
 
 const PRIMARY = '#0df2a6';
@@ -142,6 +142,7 @@ function getTimeAgo(date) {
 
 export default function FeedScreen({ navigation }) {
   const { user } = useAuth();
+  const { streakData } = useStreak();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -169,7 +170,7 @@ export default function FeedScreen({ navigation }) {
     return () => unsubscribe();
   }, []);
 
-  const handleCreatePost = async (content) => {
+  const handleCreatePost = async (content, type) => {
     if (!user) return;
 
     await addDoc(collection(db, 'posts'), {
@@ -179,8 +180,8 @@ export default function FeedScreen({ navigation }) {
       createdAt: serverTimestamp(),
       likes: 0,
       commentCount: 0,
-      type: 'Tips',
-      streakDays: 0,
+      type: type || 'Tips',
+      streakDays: streakData?.currentStreak || 0,
     });
   };
 

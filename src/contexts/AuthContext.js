@@ -1,7 +1,7 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
+import { createContext, useState, useEffect, useContext } from 'react';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   GoogleAuthProvider,
@@ -10,7 +10,7 @@ import {
 import { auth, db } from '../../config/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { sendVerificationEmail, generateVerificationCode } from '../services/emailService';
-import { saveVerificationCode, verifyCode, isEmailVerified, checkEmailExists } from '../services/verificationService';
+import { saveVerificationCode, verifyCode, isEmailVerified } from '../services/verificationService';
 
 const AuthContext = createContext({});
 
@@ -38,50 +38,65 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (email, password, username) => {
     try {
-      const emailCheck = await checkEmailExists(email);
-      if (!emailCheck.success) {
-        return { success: false, error: 'Email kontrolü yapılamadı' };
-      }
-      if (emailCheck.exists) {
-        return { success: false, error: 'Bu email adresi zaten kullanılıyor' };
+      // Firebase Auth'ta kullanıcıyı oluştur (şifre sadece burada kullanılır, Firestore'a yazılmaz)
+      let userCredential;
+      try {
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      } catch (authError) {
+        if (authError.code === 'auth/email-already-in-use') {
+          return { success: false, error: 'Bu email adresi zaten kullanılıyor' };
+        }
+        throw authError;
       }
 
+      const userId = userCredential.user.uid;
       const verificationCode = generateVerificationCode();
-      await saveVerificationCode(email, password, username, verificationCode);
-      
+
+      // Şifre Firestore'a kaydedilmiyor, sadece doğrulama kodu saklanıyor
+      await saveVerificationCode(email, username, userId, verificationCode);
+
       const emailResult = await sendVerificationEmail(email, verificationCode);
       if (!emailResult.success) {
+        // Email gönderilemezse Firebase Auth kullanıcısını sil
+        await userCredential.user.delete();
         return { success: false, error: 'Email gönderilemedi. Lütfen tekrar deneyin.' };
       }
 
-      return { success: true, email: email };
+      return { success: true, email };
     } catch (error) {
       return { success: false, error: error.message };
     }
   };
 
-  const completeRegistration = async (email, password, username) => {
+  // Doğrulama sonrası Firestore'a kullanıcı profili ve streak oluşturur
+  const completeRegistration = async (email, username) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const userId = userCredential.user.uid;
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        return { success: false, error: 'Oturum bulunamadı. Lütfen tekrar deneyin.' };
+      }
+
+      const userId = currentUser.uid;
 
       await setDoc(doc(db, 'users', userId), {
-        email: email,
-        username: username,
+        email,
+        username,
         createdAt: new Date(),
         emailVerified: true,
         verifiedAt: new Date(),
       });
 
       await setDoc(doc(db, 'streaks', userId), {
-        userId: userId,
+        userId,
         currentStreak: 0,
         longestStreak: 0,
         lastCheckDate: new Date(),
         startDate: new Date(),
-        relapses: 0
+        relapses: 0,
       });
 
+      // Kullanıcıyı app state'e ekle - ana ekrana yönlendirir
+      setUser(currentUser);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -135,13 +150,13 @@ export const AuthProvider = ({ children }) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const userId = userCredential.user.uid;
-      
+
       const verificationResult = await isEmailVerified(userId);
       if (!verificationResult.verified) {
         await firebaseSignOut(auth);
-        return { success: false, error: 'EMAIL_NOT_VERIFIED', userId: userId, email: email };
+        return { success: false, error: 'EMAIL_NOT_VERIFIED', userId, email };
       }
-      
+
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -157,16 +172,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const resendVerificationEmail = async (email, password, username) => {
+  const resendVerificationEmail = async (email, username) => {
     try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        return { success: false, error: 'Oturum bulunamadı' };
+      }
+
+      const userId = currentUser.uid;
       const verificationCode = generateVerificationCode();
-      await saveVerificationCode(email, password, username, verificationCode);
-      
+      await saveVerificationCode(email, username, userId, verificationCode);
+
       const emailResult = await sendVerificationEmail(email, verificationCode);
       if (!emailResult.success) {
         return { success: false, error: 'Email gönderilemedi. Lütfen tekrar deneyin.' };
       }
-      
+
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -183,16 +204,16 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      register, 
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      register,
       completeRegistration,
       loginWithGoogle,
-      login, 
-      logout, 
-      resendVerificationEmail, 
-      verifyEmailCode 
+      login,
+      logout,
+      resendVerificationEmail,
+      verifyEmailCode
     }}>
       {children}
     </AuthContext.Provider>

@@ -6,31 +6,14 @@ const CODE_EXPIRY_MINUTES = 5;
 
 export const checkEmailExists = async (email) => {
   try {
-    // Users collection'da kontrol et
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('email', '==', email));
     const querySnapshot = await getDocs(q);
-    
+
     if (!querySnapshot.empty) {
       return { success: true, exists: true, location: 'users' };
     }
-    
-    // EmailVerifications collection'da kontrol et (eski kayıt var mı?)
-    const verificationDoc = await getDoc(doc(db, VERIFICATION_COLLECTION, email));
-    if (verificationDoc.exists()) {
-      const data = verificationDoc.data();
-      const now = new Date();
-      const expiresAt = data.expiresAt.toDate();
-      
-      // Süresi dolmuşsa sil ve devam et
-      if (now > expiresAt) {
-        await deleteDoc(doc(db, VERIFICATION_COLLECTION, email));
-        return { success: true, exists: false };
-      }
-      
-      return { success: true, exists: true, location: 'verification' };
-    }
-    
+
     return { success: true, exists: false };
   } catch (error) {
     console.error('Check Email Exists Error:', error);
@@ -38,15 +21,16 @@ export const checkEmailExists = async (email) => {
   }
 };
 
-export const saveVerificationCode = async (email, password, username, code) => {
+// Şifre artık Firestore'a kaydedilmiyor - Firebase Auth'ta güvenli şekilde saklanıyor
+export const saveVerificationCode = async (email, username, userId, code) => {
   try {
     const expiryTime = new Date();
     expiryTime.setMinutes(expiryTime.getMinutes() + CODE_EXPIRY_MINUTES);
 
     await setDoc(doc(db, VERIFICATION_COLLECTION, email), {
       email,
-      password,
       username,
+      userId,
       code,
       createdAt: new Date(),
       expiresAt: expiryTime,
@@ -98,12 +82,12 @@ export const verifyCode = async (email, inputCode) => {
       verifiedAt: new Date(),
     });
 
-    return { 
-      success: true, 
+    // Şifre artık Firestore'da saklanmıyor - sadece email ve username döndürülüyor
+    return {
+      success: true,
       data: {
         email: data.email,
-        password: data.password,
-        username: data.username
+        username: data.username,
       }
     };
   } catch (error) {
@@ -115,7 +99,7 @@ export const verifyCode = async (email, inputCode) => {
 export const isEmailVerified = async (userId) => {
   try {
     const userDoc = await getDoc(doc(db, 'users', userId));
-    
+
     if (!userDoc.exists()) {
       return { success: true, verified: false };
     }
@@ -141,7 +125,7 @@ export const deleteVerificationCode = async (email) => {
 export const getVerificationData = async (email) => {
   try {
     const verificationDoc = await getDoc(doc(db, VERIFICATION_COLLECTION, email));
-    
+
     if (!verificationDoc.exists()) {
       return { success: false, error: 'Doğrulama verisi bulunamadı' };
     }

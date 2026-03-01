@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -60,7 +59,7 @@ export default function RegisterScreen({ navigation }) {
       const errorMessage = getAuthErrorMessage(result.error);
       setError(errorMessage);
     } else {
-      navigation.navigate('Verification', { email: result.email, password: password, username: username });
+      navigation.navigate('Verification', { email: result.email, username: username });
     }
   };
 

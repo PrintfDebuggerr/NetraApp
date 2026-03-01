@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -101,10 +101,10 @@ export default function ProfileScreen() {
     await logout();
   };
 
-  const currentStreak = streakData?.currentStreak || 12;
-  const longestStreak = streakData?.longestStreak || 45;
-  const xp = 450;
-  const daysToSober = 90;
+  const currentStreak = streakData?.currentStreak || 0;
+  const longestStreak = streakData?.longestStreak || 0;
+  const xp = currentStreak * 10 + longestStreak * 5;
+  const daysToSober = Math.max(0, 90 - currentStreak);
   const userName = user?.email?.split('@')[0] || 'User';
 
   return (
@@ -196,32 +196,32 @@ export default function ProfileScreen() {
               <AchievementBadge
                 icon={<Ionicons name="trophy" size={28} color="#facc15" />}
                 label="First Week"
-                isUnlocked={true}
+                isUnlocked={currentStreak >= 7}
                 gradientColors={['#facc15', '#ea580c']}
               />
               <AchievementBadge
                 icon={<MaterialCommunityIcons name="brain" size={28} color={PRIMARY} />}
                 label="Mindful"
-                isUnlocked={true}
+                isUnlocked={currentStreak >= 14}
                 gradientColors={['#60a5fa', PRIMARY]}
               />
               <AchievementBadge
-                icon={<Ionicons name="medal" size={28} color="#9ca3af" />}
-                label="Locked"
-                isUnlocked={false}
-                gradientColors={['#6b7280', '#4b5563']}
+                icon={<Ionicons name="medal" size={28} color="#c084fc" />}
+                label="30 Days"
+                isUnlocked={currentStreak >= 30}
+                gradientColors={['#a855f7', '#6366f1']}
               />
               <AchievementBadge
-                icon={<Ionicons name="ribbon" size={28} color="#9ca3af" />}
-                label="Locked"
-                isUnlocked={false}
-                gradientColors={['#6b7280', '#4b5563']}
+                icon={<Ionicons name="ribbon" size={28} color="#fb923c" />}
+                label="60 Days"
+                isUnlocked={currentStreak >= 60}
+                gradientColors={['#f97316', '#ef4444']}
               />
               <AchievementBadge
-                icon={<Ionicons name="star" size={28} color="#9ca3af" />}
-                label="Locked"
-                isUnlocked={false}
-                gradientColors={['#6b7280', '#4b5563']}
+                icon={<Ionicons name="star" size={28} color="#fbbf24" />}
+                label="90 Days"
+                isUnlocked={currentStreak >= 90}
+                gradientColors={['#f59e0b', '#10b981']}
               />
             </ScrollView>
           </View>
