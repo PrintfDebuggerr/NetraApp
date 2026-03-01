@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc, increment, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useStreak } from '../contexts/StreakContext';
@@ -66,18 +66,18 @@ function StreakBadge({ days }) {
 }
 
 // Post Card Component
-function CommunityPostCard({ post, onPress, isHighlighted }) {
+function CommunityPostCard({ post, onPress, onUpvote, isHighlighted, currentUserId }) {
   const timeAgo = post.createdAt ? getTimeAgo(post.createdAt.toDate()) : 'Just now';
   const postType = post.type || 'Tips';
   const streakDays = post.streakDays || 0;
-  const isUpvoted = post.isUpvoted || false;
-  
+  const isUpvoted = currentUserId ? (post.likedBy || []).includes(currentUserId) : false;
+
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
-        styles.postCard, 
+        styles.postCard,
         isHighlighted && styles.postCardHighlighted
-      ]} 
+      ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -95,10 +95,10 @@ function CommunityPostCard({ post, onPress, isHighlighted }) {
         </View>
         <PostTag type={postType} />
       </View>
-      
+
       {/* Post Content */}
       <Text style={styles.postContent}>{post.content}</Text>
-      
+
       {/* Interaction Footer */}
       <View style={styles.postFooter}>
         <View style={styles.quittrBrand}>
@@ -110,8 +110,10 @@ function CommunityPostCard({ post, onPress, isHighlighted }) {
             <Ionicons name="chatbubble-outline" size={16} color="#94a3b8" />
             <Text style={styles.commentCount}>{post.commentCount || 0}</Text>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.upvoteButton, isUpvoted && styles.upvoteButtonActive]}
+            onPress={() => onUpvote(post)}
+            activeOpacity={0.8}
           >
             <Text style={[styles.upvoteCount, isUpvoted && styles.upvoteCountActive]}>
               {post.likes || 0}
@@ -185,6 +187,16 @@ export default function FeedScreen({ navigation }) {
     });
   };
 
+  const handleUpvote = async (post) => {
+    if (!user) return;
+    const postRef = doc(db, 'posts', post.id);
+    const isLiked = (post.likedBy || []).includes(user.uid);
+    await updateDoc(postRef, {
+      likes: increment(isLiked ? -1 : 1),
+      likedBy: isLiked ? arrayRemove(user.uid) : arrayUnion(user.uid),
+    });
+  };
+
   const handlePostPress = (post) => {
     navigation.navigate('PostDetail', { post });
   };
@@ -255,10 +267,12 @@ export default function FeedScreen({ navigation }) {
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item, index }) => (
-          <CommunityPostCard 
-            post={item} 
+          <CommunityPostCard
+            post={item}
             onPress={() => handlePostPress(item)}
+            onUpvote={handleUpvote}
             isHighlighted={index === 0}
+            currentUserId={user?.uid}
           />
         )}
         contentContainerStyle={styles.listContent}

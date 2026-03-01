@@ -11,6 +11,10 @@ import {
   calculateBrainRewiring,
   getStreakTimer,
 } from '../utils/streakManager';
+import {
+  checkAndNotifyMilestone,
+  resetNotifiedMilestones,
+} from '../services/notificationService';
 
 const StreakContext = createContext({});
 
@@ -65,6 +69,7 @@ export const StreakProvider = ({ children }) => {
         }
         setStreakData(updatedData);
         setTimer(getStreakTimer(updatedData.startDate));
+        checkAndNotifyMilestone(updatedData.currentStreak);
       }
     } catch (error) {
       console.error('Error loading streak:', error);
@@ -74,23 +79,44 @@ export const StreakProvider = ({ children }) => {
 
   const handleReset = async () => {
     if (!streakData || !user) return;
-    
+
     const newData = resetStreak(streakData);
     setStreakData(newData);
     setTimer({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-    
+
     await saveLocalStreak(newData);
     await saveFirestoreStreak(user.uid, newData);
+    resetNotifiedMilestones(); // sıfırlama sonrası milestone bildirimlerini de sıfırla
   };
 
   const syncWithFirestore = async () => {
     if (!user || !streakData) return;
-    
+
     try {
       await saveFirestoreStreak(user.uid, streakData);
     } catch (error) {
       console.error('Error syncing with Firestore:', error);
     }
+  };
+
+  const handleEditStreak = async (days) => {
+    if (!streakData || !user) return;
+
+    const now = new Date();
+    const newStartDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const newData = {
+      ...streakData,
+      currentStreak: days,
+      longestStreak: Math.max(days, streakData.longestStreak || 0),
+      startDate: newStartDate,
+      lastCheckDate: now,
+    };
+
+    setStreakData(newData);
+    setTimer(getStreakTimer(newStartDate));
+    await saveLocalStreak(newData);
+    await saveFirestoreStreak(user.uid, newData);
+    checkAndNotifyMilestone(days);
   };
 
   const brainRewiring = streakData ? calculateBrainRewiring(streakData.currentStreak) : 0;
@@ -103,6 +129,7 @@ export const StreakProvider = ({ children }) => {
         loading,
         brainRewiring,
         resetStreak: handleReset,
+        editStreak: handleEditStreak,
         refreshStreak: loadStreak,
         syncWithFirestore,
       }}

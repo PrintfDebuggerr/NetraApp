@@ -22,8 +22,12 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
 
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, sendPasswordReset, getVerificationUsername } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
   const googleConfig = useMemo(() => getGoogleAuthConfig(), []);
   const hasGoogleConfig = Boolean(
@@ -34,10 +38,10 @@ export default function LoginScreen({ navigation }) {
   );
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: googleConfig.expoClientId || undefined,
-    iosClientId: googleConfig.iosClientId || undefined,
-    androidClientId: googleConfig.androidClientId || undefined,
-    webClientId: googleConfig.webClientId || undefined,
+    clientId: googleConfig.expoClientId || 'disabled',
+    iosClientId: googleConfig.iosClientId || 'disabled',
+    androidClientId: googleConfig.androidClientId || 'disabled',
+    webClientId: googleConfig.webClientId || 'disabled',
     prompt: 'select_account',
   });
 
@@ -56,11 +60,17 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     const result = await login(email, password);
-    setLoading(false);
 
     if (!result.success) {
-      const errorMessage = getAuthErrorMessage(result.error);
-      setError(errorMessage);
+      if (result.error === 'EMAIL_NOT_VERIFIED') {
+        // Firebase Auth oturumu açık, username'i Firestore'dan çek ve doğrulama ekranına git
+        const username = await getVerificationUsername(result.email) || result.email.split('@')[0];
+        setLoading(false);
+        navigation.navigate('Verification', { email: result.email, username });
+        return;
+      }
+      setLoading(false);
+      setError(getAuthErrorMessage(result.error));
     }
   };
 
@@ -86,6 +96,22 @@ export default function LoginScreen({ navigation }) {
 
     runGoogleLogin();
   }, [response, loginWithGoogle]);
+
+  const handleForgotPassword = async () => {
+    setResetMessage('');
+    if (!validateEmail(resetEmail)) {
+      setResetMessage('Geçerli bir email adresi girin.');
+      return;
+    }
+    setResetLoading(true);
+    const result = await sendPasswordReset(resetEmail);
+    setResetLoading(false);
+    if (result.success) {
+      setResetMessage('Şifre sıfırlama emaili gönderildi. Gelen kutunu kontrol et.');
+    } else {
+      setResetMessage('Email gönderilemedi. Email adresini kontrol et.');
+    }
+  };
 
   const handleGoogleLogin = async () => {
     setError('');
@@ -135,6 +161,43 @@ export default function LoginScreen({ navigation }) {
             autoCapitalize="none"
             autoCorrect={false}
           />
+
+          <TouchableOpacity
+            style={styles.forgotPasswordLink}
+            onPress={() => { setShowForgotPassword(!showForgotPassword); setResetMessage(''); }}
+          >
+            <Text style={styles.forgotPasswordText}>Şifremi Unuttum</Text>
+          </TouchableOpacity>
+
+          {showForgotPassword && (
+            <View style={styles.forgotPasswordBox}>
+              <TextInput
+                style={styles.input}
+                placeholder="Email adresin"
+                placeholderTextColor="#999"
+                value={resetEmail}
+                onChangeText={setResetEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              {resetMessage ? (
+                <Text style={[styles.errorText, resetMessage.includes('gönderildi') && styles.successText]}>
+                  {resetMessage}
+                </Text>
+              ) : null}
+              <TouchableOpacity
+                style={[styles.button, resetLoading && styles.buttonDisabled]}
+                onPress={handleForgotPassword}
+                disabled={resetLoading}
+              >
+                {resetLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Sıfırlama Emaili Gönder</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -265,6 +328,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 10,
     textAlign: 'center',
+  },
+  successText: {
+    color: '#0df2a6',
+  },
+  forgotPasswordLink: {
+    alignSelf: 'flex-end',
+    marginBottom: 8,
+  },
+  forgotPasswordText: {
+    color: '#e94560',
+    fontSize: 13,
+  },
+  forgotPasswordBox: {
+    backgroundColor: '#16213e',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#0f3460',
   },
   dividerRow: {
     flexDirection: 'row',

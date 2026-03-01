@@ -92,7 +92,7 @@ function SettingsItem({ icon, iconBgColor, title, subtitle, hasToggle, toggleVal
   );
 }
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
   const { streakData } = useStreak();
   const [internetFilter, setInternetFilter] = useState(true);
@@ -133,7 +133,7 @@ export default function ProfileScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
             <Text style={styles.settingsLink}>SETTINGS</Text>
           </TouchableOpacity>
         </View>

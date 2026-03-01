@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithCredential
 } from 'firebase/auth';
@@ -153,8 +154,8 @@ export const AuthProvider = ({ children }) => {
 
       const verificationResult = await isEmailVerified(userId);
       if (!verificationResult.verified) {
-        await firebaseSignOut(auth);
-        return { success: false, error: 'EMAIL_NOT_VERIFIED', userId, email };
+        // Firebase Auth oturumu kapatılmıyor: VerificationScreen'de resend için auth.currentUser gerekli
+        return { success: false, error: 'EMAIL_NOT_VERIFIED', email };
       }
 
       return { success: true };
@@ -169,6 +170,26 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
+    }
+  };
+
+  const sendPasswordReset = async (email) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
+  // emailVerifications koleksiyonundan username çek (login sonrası doğrulama akışı için)
+  const getVerificationUsername = async (email) => {
+    try {
+      const snap = await getDoc(doc(db, 'emailVerifications', email));
+      if (snap.exists()) return snap.data().username || null;
+      return null;
+    } catch {
+      return null;
     }
   };
 
@@ -212,6 +233,8 @@ export const AuthProvider = ({ children }) => {
       loginWithGoogle,
       login,
       logout,
+      sendPasswordReset,
+      getVerificationUsername,
       resendVerificationEmail,
       verifyEmailCode
     }}>

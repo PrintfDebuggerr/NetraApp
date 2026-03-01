@@ -1,17 +1,25 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
   ScrollView,
   Dimensions,
+  Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStreak } from '../contexts/StreakContext';
+import { useAuth } from '../contexts/AuthContext';
 import PanicModal from '../components/PanicModal';
 import { getCurrentBadge } from '../utils/badgeData';
+import { db } from '../../config/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
 
@@ -80,11 +88,58 @@ function ActionButton({ icon, label, color, onPress }) {
 }
 
 export default function HomeScreen({ navigation }) {
-  const { streakData, timer, brainRewiring } = useStreak();
+  const { streakData, timer, brainRewiring, resetStreak, editStreak } = useStreak();
+  const { user } = useAuth();
   const [showPanicModal, setShowPanicModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editDays, setEditDays] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
 
-  const currentStreak = streakData?.currentStreak || 35;
+  const currentStreak = streakData?.currentStreak || 0;
   const currentBadge = getCurrentBadge(currentStreak);
+
+  const handlePledge = () => {
+    Alert.alert(
+      'Take a Pledge',
+      'Do you commit to your recovery journey and pledge to stay strong today?',
+      [
+        { text: 'Not now', style: 'cancel' },
+        {
+          text: 'I Pledge!',
+          onPress: async () => {
+            try {
+              if (!user) return;
+              await setDoc(
+                doc(db, 'pledges', user.uid),
+                { userId: user.uid, pledgedAt: serverTimestamp() },
+                { merge: true }
+              );
+              Alert.alert('Pledge Made!', 'You\'ve committed to your journey. Stay strong!');
+            } catch {
+              Alert.alert('Error', 'Could not save pledge. Try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEditStreak = async () => {
+    const days = parseInt(editDays, 10);
+    if (isNaN(days) || days < 0) {
+      Alert.alert('Invalid Input', 'Please enter a valid number of days (0 or more).');
+      return;
+    }
+    setEditLoading(true);
+    try {
+      await editStreak(days);
+      setShowEditModal(false);
+      setEditDays('');
+    } catch {
+      Alert.alert('Error', 'Could not update streak. Try again.');
+    }
+    setEditLoading(false);
+  };
 
   // Get week days based on current day
   const getWeekDays = () => {
@@ -208,21 +263,36 @@ export default function HomeScreen({ navigation }) {
 
           {/* Quick Actions */}
           <View style={styles.actionsContainer}>
-            <ActionButton 
-              icon={<MaterialCommunityIcons name="handshake" size={24} color="#0df2a6" />} 
-              label="Pledge" 
+            <ActionButton
+              icon={<MaterialCommunityIcons name="handshake" size={24} color="#0df2a6" />}
+              label="Pledge"
+              onPress={handlePledge}
             />
-            <ActionButton 
-              icon={<MaterialCommunityIcons name="meditation" size={24} color="#0df2a6" />} 
-              label="Meditate" 
+            <ActionButton
+              icon={<MaterialCommunityIcons name="meditation" size={24} color="#0df2a6" />}
+              label="Meditate"
             />
-            <ActionButton 
-              icon={<Ionicons name="refresh" size={24} color="#0df2a6" />} 
-              label="Reset" 
+            <ActionButton
+              icon={<Ionicons name="refresh" size={24} color="#0df2a6" />}
+              label="Reset"
+              onPress={() =>
+                Alert.alert(
+                  'Reset Streak',
+                  'Are you sure you want to reset your streak? This will record a relapse.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Reset', style: 'destructive', onPress: resetStreak },
+                  ]
+                )
+              }
             />
-            <ActionButton 
-              icon={<Ionicons name="pencil" size={22} color="#9ca3af" />} 
-              label="Edit Streak" 
+            <ActionButton
+              icon={<Ionicons name="pencil" size={22} color="#9ca3af" />}
+              label="Edit Streak"
+              onPress={() => {
+                setEditDays(String(currentStreak));
+                setShowEditModal(true);
+              }}
             />
           </View>
 
@@ -265,10 +335,56 @@ export default function HomeScreen({ navigation }) {
         </ScrollView>
 
         {/* Panic Modal */}
-        <PanicModal 
-          visible={showPanicModal} 
-          onClose={() => setShowPanicModal(false)} 
+        <PanicModal
+          visible={showPanicModal}
+          onClose={() => setShowPanicModal(false)}
         />
+
+        {/* Edit Streak Modal */}
+        <Modal
+          visible={showEditModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowEditModal(false)}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalOverlay}
+          >
+            <View style={styles.editModal}>
+              <Text style={styles.editModalTitle}>Edit Streak</Text>
+              <Text style={styles.editModalSubtitle}>
+                Correct your streak if it's inaccurate. Enter the actual number of days.
+              </Text>
+              <TextInput
+                style={styles.editModalInput}
+                value={editDays}
+                onChangeText={setEditDays}
+                keyboardType="number-pad"
+                placeholder="Days"
+                placeholderTextColor="#6b7280"
+                maxLength={4}
+              />
+              <View style={styles.editModalActions}>
+                <TouchableOpacity
+                  style={styles.editModalCancel}
+                  onPress={() => setShowEditModal(false)}
+                >
+                  <Text style={styles.editModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.editModalConfirm, editLoading && { opacity: 0.6 }]}
+                  onPress={handleEditStreak}
+                  disabled={editLoading}
+                >
+                  <Text style={styles.editModalConfirmText}>
+                    {editLoading ? 'Saving...' : 'Save'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </LinearGradient>
     </View>
   );
@@ -636,5 +752,74 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: 3,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  editModal: {
+    backgroundColor: '#1a2332',
+    borderRadius: 20,
+    padding: 28,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(13,242,166,0.2)',
+  },
+  editModalTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  editModalSubtitle: {
+    color: '#9ca3af',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  editModalInput: {
+    backgroundColor: '#0f1522',
+    color: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(13,242,166,0.3)',
+    marginBottom: 20,
+  },
+  editModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  editModalCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+  },
+  editModalCancelText: {
+    color: '#9ca3af',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  editModalConfirm: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#0df2a6',
+    alignItems: 'center',
+  },
+  editModalConfirmText: {
+    color: '#0a0e27',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

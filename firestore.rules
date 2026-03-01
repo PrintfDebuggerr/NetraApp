@@ -18,13 +18,18 @@ service cloud.firestore {
     match /posts/{postId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Post sahibi her şeyi güncelleyebilir; diğerleri sadece likes ve likedBy'ı
+      allow update: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'commentCount'])
+      );
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     // Comments - herkes okuyabilir, sadece sahibi düzenleyebilir
     match /comments/{commentId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
       allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
@@ -33,6 +38,11 @@ service cloud.firestore {
     match /emailVerifications/{email} {
       allow read, create, update: if request.auth != null;
       allow delete: if request.auth != null;
+    }
+
+    // Pledges - kullanıcı yalnızca kendi pledge'ini okuyup yazabilir
+    match /pledges/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

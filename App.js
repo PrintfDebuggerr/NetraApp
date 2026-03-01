@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { StreakProvider } from './src/contexts/StreakContext';
 import AuthStack from './src/navigation/AuthStack';
 import MainTabs from './src/navigation/MainTabs';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { setupNotificationHandler } from './src/services/notificationService';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -19,6 +20,9 @@ function AppContent() {
 
   return user ? <MainTabs /> : <AuthStack />;
 }
+
+// Bildirim handler'ı uygulama başlarken bir kez kur
+setupNotificationHandler();
 
 export default function App() {
   return (

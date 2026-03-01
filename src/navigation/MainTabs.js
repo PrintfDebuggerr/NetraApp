@@ -6,7 +6,7 @@ import HomeStack from './HomeStack';
 import StatsScreen from '../screens/StatsScreen';
 import LibraryScreen from '../screens/LibraryScreen';
 import FeedStack from './FeedStack';
-import ProfileScreen from '../screens/ProfileScreen';
+import ProfileStack from './ProfileStack';
 
 const Tab = createBottomTabNavigator();
 
@@ -57,9 +57,9 @@ export default function MainTabs() {
         name="Feed" 
         component={FeedStack}
       />
-      <Tab.Screen 
-        name="Profile" 
-        component={ProfileScreen}
+      <Tab.Screen
+        name="Profile"
+        component={ProfileStack}
       />
     </Tab.Navigator>
   );

@@ -8,15 +8,30 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  doc,
+  increment,
+  arrayUnion,
+  arrayRemove,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 const PRIMARY = '#0df2a6';
 
-// Yıldız efekti için rastgele noktalar
+// Yıldız efekti
 const generateStars = (count) => {
   const stars = [];
   for (let i = 0; i < count; i++) {
@@ -30,10 +45,8 @@ const generateStars = (count) => {
   }
   return stars;
 };
-
 const stars = generateStars(30);
 
-// Post Tag Component
 function PostTag({ type }) {
   const tagStyles = {
     Victory: { bg: 'rgba(34, 197, 94, 0.1)', border: 'rgba(34, 197, 94, 0.3)', text: '#4ade80' },
@@ -42,9 +55,7 @@ function PostTag({ type }) {
     Question: { bg: 'rgba(13, 242, 166, 0.1)', border: 'rgba(13, 242, 166, 0.3)', text: PRIMARY },
     Relapse: { bg: 'rgba(100, 116, 139, 0.1)', border: 'rgba(100, 116, 139, 0.3)', text: '#94a3b8' },
   };
-  
   const style = tagStyles[type] || tagStyles.Question;
-  
   return (
     <View style={[styles.postTag, { backgroundColor: style.bg, borderColor: style.border }]}>
       <Text style={[styles.postTagText, { color: style.text }]}>{type}</Text>
@@ -52,20 +63,21 @@ function PostTag({ type }) {
   );
 }
 
-// Comment Item Component
+function getTimeAgo(date) {
+  if (!date) return '';
+  const d = date.toDate ? date.toDate() : new Date(date);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
+}
+
 function CommentItem({ comment }) {
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(comment.likes || 0);
-
-  const handleLike = () => {
-    if (liked) {
-      setLikeCount(likeCount - 1);
-    } else {
-      setLikeCount(likeCount + 1);
-    }
-    setLiked(!liked);
-  };
-
   return (
     <View style={styles.commentItem}>
       <View style={styles.commentAvatar}>
@@ -73,30 +85,10 @@ function CommentItem({ comment }) {
       </View>
       <View style={styles.commentContent}>
         <View style={styles.commentHeader}>
-          <Text style={styles.commentAuthor}>{comment.author}</Text>
-          <Text style={styles.commentTime}>{comment.time}</Text>
+          <Text style={styles.commentAuthor}>{comment.userName || 'Anonymous'}</Text>
+          <Text style={styles.commentTime}>{getTimeAgo(comment.createdAt)}</Text>
         </View>
-        <Text style={styles.commentText}>{comment.text}</Text>
-        <View style={styles.commentActions}>
-          <TouchableOpacity 
-            style={styles.commentAction} 
-            onPress={handleLike}
-            activeOpacity={0.7}
-          >
-            <Ionicons 
-              name={liked ? "heart" : "heart-outline"} 
-              size={18} 
-              color={liked ? PRIMARY : "#9ca3af"} 
-            />
-            <Text style={[styles.commentActionText, liked && { color: PRIMARY }]}>
-              {likeCount}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.commentAction} activeOpacity={0.7}>
-            <Ionicons name="chatbubble-outline" size={18} color="#9ca3af" />
-            <Text style={styles.commentActionText}>Reply</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.commentText}>{comment.content}</Text>
       </View>
     </View>
   );
@@ -105,128 +97,118 @@ function CommentItem({ comment }) {
 export default function PostDetailScreen({ route, navigation }) {
   const { post } = route.params;
   const { user } = useAuth();
+
+  const [comments, setComments] = useState([]);
+  const [loadingComments, setLoadingComments] = useState(true);
   const [commentText, setCommentText] = useState('');
-  const [upvoted, setUpvoted] = useState(false);
-  const [upvoteCount, setUpvoteCount] = useState(post?.upvotes || 15);
+  const [sending, setSending] = useState(false);
 
-  // Mock comments data
-  const [comments, setComments] = useState([
-    {
-      id: '1',
-      author: 'Sarah_Design',
-      text: 'Totally agree! My static posts are barely getting seen. I\'ve started doing carousel posts mixed with short clips, seems to help a bit.',
-      time: '2h ago',
-      likes: 12,
-    },
-    {
-      id: '2',
-      author: 'DevMike',
-      text: 'It\'s just the trend right now. TikTok influence is everywhere. I wouldn\'t worry too much, quality content usually wins in the long run.',
-      time: '4h ago',
-      likes: 5,
-    },
-    {
-      id: '3',
-      author: 'Elena_Rx',
-      text: 'Have you tried optimizing your alt text and hashtags? Sometimes that makes a difference even for static images.',
-      time: '5h ago',
-      likes: 2,
-    },
-    {
-      id: '4',
-      author: 'AlexCode',
-      text: 'Short form video is king right now 👑. Adapt or die I guess?',
-      time: '6h ago',
-      likes: 8,
-    },
-  ]);
+  // Post'u real-time izle (likes güncellemeleri için)
+  const [livePost, setLivePost] = useState(post);
 
-  const handleUpvote = () => {
-    if (upvoted) {
-      setUpvoteCount(upvoteCount - 1);
-    } else {
-      setUpvoteCount(upvoteCount + 1);
-    }
-    setUpvoted(!upvoted);
+  useEffect(() => {
+    const postRef = doc(db, 'posts', post.id);
+    const unsubPost = onSnapshot(postRef, (snap) => {
+      if (snap.exists()) {
+        setLivePost({ id: snap.id, ...snap.data() });
+      }
+    });
+    return () => unsubPost();
+  }, [post.id]);
+
+  // Yorumları real-time dinle
+  useEffect(() => {
+    const q = query(
+      collection(db, 'comments'),
+      where('postId', '==', post.id),
+      orderBy('createdAt', 'desc')
+    );
+    const unsubComments = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setComments(data);
+      setLoadingComments(false);
+    }, () => setLoadingComments(false));
+    return () => unsubComments();
+  }, [post.id]);
+
+  const isUpvoted = user ? (livePost.likedBy || []).includes(user.uid) : false;
+
+  const handleUpvote = async () => {
+    if (!user) return;
+    const postRef = doc(db, 'posts', post.id);
+    await updateDoc(postRef, {
+      likes: increment(isUpvoted ? -1 : 1),
+      likedBy: isUpvoted ? arrayRemove(user.uid) : arrayUnion(user.uid),
+    });
   };
 
-  const handleSendComment = () => {
-    if (commentText.trim()) {
+  const handleSendComment = async () => {
+    if (!commentText.trim() || !user) return;
+    setSending(true);
+    try {
       const newComment = {
-        id: Date.now().toString(),
-        author: user?.email?.split('@')[0] || 'User',
-        text: commentText.trim(),
-        time: 'Just now',
-        likes: 0,
+        postId: post.id,
+        userId: user.uid,
+        userName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
+        content: commentText.trim(),
+        createdAt: serverTimestamp(),
       };
-      setComments([newComment, ...comments]);
+      await addDoc(collection(db, 'comments'), newComment);
+
+      // Yorum sayısını artır
+      await updateDoc(doc(db, 'posts', post.id), {
+        commentCount: increment(1),
+      });
+
       setCommentText('');
+    } catch (e) {
+      console.error('Comment error:', e);
     }
+    setSending(false);
   };
 
-  const authorName = post?.authorName || post?.author || 'Anonymous';
-  const streakDays = post?.streakDays || 0;
-  const postType = post?.type || 'Question';
-  const postContent = post?.content || post?.text || 'No content available';
+  const authorName = livePost.userName || livePost.authorName || 'Anonymous';
+  const streakDays = livePost.streakDays || 0;
+  const postType = livePost.type || 'Question';
+  const postContent = livePost.content || 'No content available';
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <LinearGradient
-        colors={['#0B1121', '#162035', '#1a2642']}
-        style={styles.gradient}
-      >
+      <LinearGradient colors={['#0B1121', '#162035', '#1a2642']} style={styles.gradient}>
         {/* Yıldız efekti */}
         {stars.map((star) => (
           <View
             key={star.id}
             style={[
               styles.star,
-              {
-                left: `${star.left}%`,
-                top: `${star.top}%`,
-                width: star.size,
-                height: star.size,
-                opacity: star.opacity,
-              },
+              { left: `${star.left}%`, top: `${star.top}%`, width: star.size, height: star.size, opacity: star.opacity },
             ]}
           />
         ))}
 
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Post</Text>
           <View style={styles.headerRight}>
-            <Text style={styles.upvoteCountHeader}>{upvoteCount}</Text>
-            <TouchableOpacity 
-              style={[styles.upvoteButton, upvoted && styles.upvoteButtonActive]}
+            <Text style={styles.upvoteCountHeader}>{livePost.likes || 0}</Text>
+            <TouchableOpacity
+              style={[styles.upvoteButton, isUpvoted && styles.upvoteButtonActive]}
               onPress={handleUpvote}
               activeOpacity={0.8}
             >
-              <Ionicons 
-                name="arrow-up" 
-                size={20} 
-                color={upvoted ? '#0B1121' : '#fff'} 
-              />
+              <Ionicons name="arrow-up" size={20} color={isUpvoted ? '#0B1121' : '#fff'} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Scrollable Content */}
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Post Author Info */}
           <View style={styles.authorSection}>
             <View style={styles.authorAvatar}>
@@ -249,20 +231,27 @@ export default function PostDetailScreen({ route, navigation }) {
 
           {/* Comments Header */}
           <View style={styles.commentsHeader}>
-            <Text style={styles.commentsTitle}>Comments</Text>
-            <TouchableOpacity activeOpacity={0.7}>
-              <Ionicons name="ellipsis-horizontal" size={24} color="#9ca3af" />
-            </TouchableOpacity>
+            <Text style={styles.commentsTitle}>
+              Comments {comments.length > 0 ? `(${comments.length})` : ''}
+            </Text>
           </View>
 
           {/* Comments List */}
           <View style={styles.commentsList}>
-            {comments.map((comment) => (
-              <CommentItem key={comment.id} comment={comment} />
-            ))}
+            {loadingComments ? (
+              <ActivityIndicator color={PRIMARY} style={{ marginTop: 24 }} />
+            ) : comments.length === 0 ? (
+              <View style={styles.emptyComments}>
+                <Ionicons name="chatbubble-outline" size={32} color="#475569" />
+                <Text style={styles.emptyCommentsText}>İlk yorumu sen yap!</Text>
+              </View>
+            ) : (
+              comments.map((comment) => (
+                <CommentItem key={comment.id} comment={comment} />
+              ))
+            )}
           </View>
 
-          {/* Bottom spacing for input */}
           <View style={{ height: 120 }} />
         </ScrollView>
 
@@ -278,13 +267,17 @@ export default function PostDetailScreen({ route, navigation }) {
               multiline={false}
             />
           </View>
-          <TouchableOpacity 
-            style={[styles.sendButton, !commentText.trim() && styles.sendButtonDisabled]}
+          <TouchableOpacity
+            style={[styles.sendButton, (!commentText.trim() || sending) && styles.sendButtonDisabled]}
             onPress={handleSendComment}
-            disabled={!commentText.trim()}
+            disabled={!commentText.trim() || sending}
             activeOpacity={0.8}
           >
-            <Ionicons name="arrow-up" size={24} color="#fff" />
+            {sending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="arrow-up" size={24} color="#fff" />
+            )}
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -293,17 +286,9 @@ export default function PostDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  star: {
-    position: 'absolute',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-  },
+  container: { flex: 1 },
+  gradient: { flex: 1 },
+  star: { position: 'absolute', backgroundColor: '#fff', borderRadius: 10 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -322,21 +307,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  upvoteCountHeader: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  upvoteCountHeader: { fontSize: 18, fontWeight: '700', color: '#fff' },
   upvoteButton: {
     width: 36,
     height: 36,
@@ -350,15 +323,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
-  upvoteButtonActive: {
-    backgroundColor: '#fff',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
+  upvoteButtonActive: { backgroundColor: '#fff' },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 20 },
   authorSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -376,35 +343,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  authorInfo: {
-    flex: 1,
-  },
-  authorName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  authorStreak: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
-  streakDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#9ca3af',
-  },
-  streakText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    fontWeight: '500',
-  },
-  postContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
+  authorInfo: { flex: 1 },
+  authorName: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  authorStreak: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  streakDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#9ca3af' },
+  streakText: { fontSize: 14, color: '#9ca3af', fontWeight: '500' },
+  postContent: { paddingHorizontal: 20, paddingBottom: 24 },
   postTag: {
     alignSelf: 'flex-start',
     paddingHorizontal: 16,
@@ -413,15 +357,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 16,
   },
-  postTagText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  postText: {
-    fontSize: 16,
-    lineHeight: 28,
-    color: '#fff',
-  },
+  postTagText: { fontSize: 14, fontWeight: '700' },
+  postText: { fontSize: 16, lineHeight: 28, color: '#fff' },
   commentsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -432,14 +369,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  commentsTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  commentsList: {
-    paddingTop: 8,
-  },
+  commentsTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  commentsList: { paddingTop: 8 },
   commentItem: {
     flexDirection: 'row',
     gap: 12,
@@ -456,45 +387,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  commentContent: {
-    flex: 1,
-  },
+  commentContent: { flex: 1 },
   commentHeader: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
   },
-  commentAuthor: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  commentTime: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  commentText: {
-    fontSize: 15,
-    lineHeight: 24,
-    color: '#e5e7eb',
-    marginTop: 6,
-  },
-  commentActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 20,
-    marginTop: 12,
-  },
-  commentAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  commentActionText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#9ca3af',
-  },
+  commentAuthor: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  commentTime: { fontSize: 12, color: '#9ca3af' },
+  commentText: { fontSize: 15, lineHeight: 24, color: '#e5e7eb', marginTop: 6 },
+  emptyComments: { alignItems: 'center', paddingVertical: 32, gap: 8 },
+  emptyCommentsText: { fontSize: 14, color: '#64748b' },
   inputContainer: {
     position: 'absolute',
     bottom: 0,
@@ -510,9 +413,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.1)',
   },
-  inputWrapper: {
-    flex: 1,
-  },
+  inputWrapper: { flex: 1 },
   input: {
     backgroundColor: '#2a3548',
     borderRadius: 999,
@@ -534,7 +435,5 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
+  sendButtonDisabled: { opacity: 0.5 },
 });
