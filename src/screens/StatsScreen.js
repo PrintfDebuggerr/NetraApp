@@ -168,38 +168,108 @@ function ProgressChart() {
   );
 }
 
+// Milestone-based progress calculator
+function calculateProgress(streakDays, milestones) {
+  for (let i = milestones.length - 1; i >= 0; i--) {
+    if (streakDays >= milestones[i].days) return milestones[i].progress;
+  }
+  return milestones[0].progress;
+}
+
+const BENEFIT_CONFIGS = [
+  {
+    emoji: '💬',
+    title: 'Improved Confidence',
+    description: 'Confidence grows in social and personal interactions.',
+    color: '#0df2a6',
+    milestones: [{ days: 0, progress: 5 }, { days: 7, progress: 20 }, { days: 14, progress: 50 }, { days: 30, progress: 100 }],
+  },
+  {
+    emoji: '💥',
+    title: 'Increased Self-Esteem',
+    description: 'Improving control boosts your self-image.',
+    color: '#f472b6',
+    milestones: [{ days: 0, progress: 5 }, { days: 10, progress: 30 }, { days: 21, progress: 70 }, { days: 30, progress: 100 }],
+  },
+  {
+    emoji: '🧘',
+    title: 'Mental Clarity',
+    description: 'Clear thinking and focus returns after quitting.',
+    color: '#818cf8',
+    milestones: [{ days: 0, progress: 5 }, { days: 5, progress: 15 }, { days: 14, progress: 60 }, { days: 21, progress: 100 }],
+  },
+  {
+    emoji: '🧠',
+    title: 'Healthier Thoughts',
+    description: 'Less anxiety; healthier views on relationships.',
+    color: '#c084fc',
+    milestones: [{ days: 0, progress: 5 }, { days: 14, progress: 25 }, { days: 30, progress: 60 }, { days: 45, progress: 100 }],
+  },
+  {
+    emoji: '⏰',
+    title: 'More Productivity',
+    description: 'More energy and focus for meaningful activities.',
+    color: '#facc15',
+    milestones: [{ days: 0, progress: 10 }, { days: 7, progress: 40 }, { days: 21, progress: 80 }, { days: 30, progress: 100 }],
+  },
+  {
+    emoji: '😴',
+    title: 'Better Sleep',
+    description: 'Improved sleep quality seen within a few days.',
+    color: '#38bdf8',
+    milestones: [{ days: 0, progress: 10 }, { days: 3, progress: 30 }, { days: 7, progress: 70 }, { days: 14, progress: 100 }],
+  },
+  {
+    emoji: '🔥',
+    title: 'Increased Sex Drive',
+    description: 'Healthier drive and performance after 30-45 days.',
+    color: '#f97316',
+    milestones: [{ days: 0, progress: 0 }, { days: 30, progress: 0 }, { days: 45, progress: 50 }, { days: 60, progress: 100 }],
+  },
+  {
+    emoji: '⚡',
+    title: 'Energy Levels',
+    description: 'Physical energy noticeably increases.',
+    color: '#fbbf24',
+    milestones: [{ days: 0, progress: 5 }, { days: 7, progress: 35 }, { days: 21, progress: 75 }, { days: 30, progress: 100 }],
+  },
+  {
+    emoji: '🤝',
+    title: 'Social Skills',
+    description: 'Social interaction quality improves.',
+    color: '#4ade80',
+    milestones: [{ days: 0, progress: 5 }, { days: 10, progress: 25 }, { days: 30, progress: 70 }, { days: 60, progress: 100 }],
+  },
+  {
+    emoji: '🎯',
+    title: 'Motivation',
+    description: 'General motivation levels rise steadily.',
+    color: '#a78bfa',
+    milestones: [{ days: 0, progress: 5 }, { days: 7, progress: 30 }, { days: 21, progress: 65 }, { days: 45, progress: 100 }],
+  },
+  {
+    emoji: '💪',
+    title: 'Discipline',
+    description: 'Self-control and willpower strengthen.',
+    color: '#fb7185',
+    milestones: [{ days: 0, progress: 5 }, { days: 7, progress: 30 }, { days: 30, progress: 70 }, { days: 60, progress: 100 }],
+  },
+];
+
 // Benefit Card Component
-function BenefitCard({ emoji, title, description, progress, color }) {
-  const getProgressColor = () => {
-    if (color === 'primary') return PRIMARY;
-    if (color === 'yellow') return '#facc15';
-    if (color === 'purple') return '#a78bfa';
-    return PRIMARY;
-  };
-
-  const getBgColor = () => {
-    if (color === 'primary') return 'rgba(99, 102, 241, 0.2)';
-    if (color === 'yellow') return 'rgba(234, 179, 8, 0.2)';
-    if (color === 'purple') return 'rgba(168, 85, 247, 0.2)';
-    return 'rgba(99, 102, 241, 0.2)';
-  };
-
-  const getBorderColor = () => {
-    if (color === 'primary') return 'rgba(99, 102, 241, 0.3)';
-    if (color === 'yellow') return 'rgba(234, 179, 8, 0.3)';
-    if (color === 'purple') return 'rgba(168, 85, 247, 0.3)';
-    return 'rgba(99, 102, 241, 0.3)';
-  };
-
+function BenefitCard({ emoji, title, description, progress, barColor }) {
   const getPercentColor = () => {
     if (progress >= 70) return PRIMARY;
     if (progress >= 40) return '#d1d5db';
     return '#9ca3af';
   };
 
+  const bgColor = barColor + '22';
+  const borderColor = barColor + '44';
+
   return (
     <View style={styles.benefitCard}>
-      <View style={[styles.benefitIconContainer, { backgroundColor: getBgColor(), borderColor: getBorderColor() }]}>
+      <View style={[styles.benefitIconContainer, { backgroundColor: bgColor, borderColor }]}>
         <Text style={styles.benefitEmoji}>{emoji}</Text>
       </View>
       <View style={styles.benefitContent}>
@@ -209,11 +279,11 @@ function BenefitCard({ emoji, title, description, progress, color }) {
         </View>
         <Text style={styles.benefitDescription} numberOfLines={1}>{description}</Text>
         <View style={styles.benefitProgressBar}>
-          <View 
+          <View
             style={[
-              styles.benefitProgressFill, 
-              { width: `${progress}%`, backgroundColor: getProgressColor() }
-            ]} 
+              styles.benefitProgressFill,
+              { width: `${progress}%`, backgroundColor: barColor },
+            ]}
           />
         </View>
       </View>
@@ -238,29 +308,10 @@ export default function StatsScreen() {
 
   const targetDate = getTargetDate(streakData);
 
-  const benefits = [
-    {
-      emoji: '🧠',
-      title: 'Mental Clarity',
-      description: 'Focus is significantly improving',
-      progress: Math.min(Math.round((currentStreak / 30) * 100), 100),
-      color: 'primary',
-    },
-    {
-      emoji: '⚡',
-      title: 'Energy Levels',
-      description: 'Waking up feels easier',
-      progress: Math.min(Math.round((currentStreak / 45) * 100), 100),
-      color: 'yellow',
-    },
-    {
-      emoji: '🛌',
-      title: 'Sleep Quality',
-      description: 'Entering deep sleep phase',
-      progress: Math.min(Math.round((currentStreak / 60) * 100), 100),
-      color: 'purple',
-    },
-  ];
+  const benefits = BENEFIT_CONFIGS.map((cfg) => ({
+    ...cfg,
+    progress: calculateProgress(currentStreak, cfg.milestones),
+  }));
 
   return (
     <View style={styles.container}>
@@ -327,7 +378,7 @@ export default function StatsScreen() {
                 title={benefit.title}
                 description={benefit.description}
                 progress={benefit.progress}
-                color={benefit.color}
+                barColor={benefit.color}
               />
             ))}
           </View>

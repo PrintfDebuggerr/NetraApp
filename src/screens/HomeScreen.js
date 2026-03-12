@@ -18,8 +18,6 @@ import { useStreak } from '../contexts/StreakContext';
 import { useAuth } from '../contexts/AuthContext';
 import PanicModal from '../components/PanicModal';
 import { getCurrentBadge } from '../utils/badgeData';
-import { db } from '../../config/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
 
@@ -99,29 +97,7 @@ export default function HomeScreen({ navigation }) {
   const currentBadge = getCurrentBadge(currentStreak);
 
   const handlePledge = () => {
-    Alert.alert(
-      'Take a Pledge',
-      'Do you commit to your recovery journey and pledge to stay strong today?',
-      [
-        { text: 'Not now', style: 'cancel' },
-        {
-          text: 'I Pledge!',
-          onPress: async () => {
-            try {
-              if (!user) return;
-              await setDoc(
-                doc(db, 'pledges', user.uid),
-                { userId: user.uid, pledgedAt: serverTimestamp() },
-                { merge: true }
-              );
-              Alert.alert('Pledge Made!', 'You\'ve committed to your journey. Stay strong!');
-            } catch {
-              Alert.alert('Error', 'Could not save pledge. Try again.');
-            }
-          },
-        },
-      ]
-    );
+    navigation.navigate('Pledge');
   };
 
   const handleEditStreak = async () => {
@@ -249,6 +225,14 @@ export default function HomeScreen({ navigation }) {
           {/* Timer Info */}
           <View style={styles.timerInfo}>
             <Text style={styles.timerLabel}>You've been porn-free for:</Text>
+            {/* Milestone badge */}
+            {[7, 30, 90].includes(currentStreak) && (
+              <View style={styles.milestoneBadge}>
+                <Text style={styles.milestoneBadgeText}>
+                  🏆 {currentStreak} Day Milestone!
+                </Text>
+              </View>
+            )}
             <View style={styles.timerValueRow}>
               <Text style={styles.timerValue}>{currentStreak}</Text>
               <Text style={styles.timerUnit}>days</Text>
@@ -271,6 +255,7 @@ export default function HomeScreen({ navigation }) {
             <ActionButton
               icon={<MaterialCommunityIcons name="meditation" size={24} color="#0df2a6" />}
               label="Meditate"
+              onPress={() => navigation.navigate('Meditation')}
             />
             <ActionButton
               icon={<Ionicons name="refresh" size={24} color="#0df2a6" />}
@@ -590,6 +575,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
     paddingHorizontal: 16,
+  },
+  milestoneBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(250, 204, 21, 0.12)',
+    borderRadius: 99,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(250, 204, 21, 0.3)',
+  },
+  milestoneBadgeText: {
+    color: '#facc15',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   timerLabel: {
     color: '#9ca3af',

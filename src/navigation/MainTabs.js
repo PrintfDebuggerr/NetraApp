@@ -4,7 +4,7 @@ import { View, StyleSheet } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import HomeStack from './HomeStack';
 import StatsScreen from '../screens/StatsScreen';
-import LibraryScreen from '../screens/LibraryScreen';
+import LibraryStack from './LibraryStack';
 import FeedStack from './FeedStack';
 import ProfileStack from './ProfileStack';
 
@@ -49,9 +49,9 @@ export default function MainTabs() {
         name="Stats" 
         component={StatsScreen}
       />
-      <Tab.Screen 
-        name="Library" 
-        component={LibraryScreen}
+      <Tab.Screen
+        name="Library"
+        component={LibraryStack}
       />
       <Tab.Screen 
         name="Feed" 
