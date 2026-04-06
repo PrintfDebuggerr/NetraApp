@@ -13,15 +13,15 @@ import {
 } from 'react-native';
 
 const POST_TYPES = [
-  { key: 'Victory', label: '🏆 Victory', color: '#4ade80', bg: 'rgba(34,197,94,0.15)', border: 'rgba(34,197,94,0.3)' },
-  { key: 'Vent',    label: '😤 Vent',    color: '#f87171', bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.3)' },
-  { key: 'Tips',    label: '💡 Tips',    color: '#60a5fa', bg: 'rgba(59,130,246,0.15)', border: 'rgba(59,130,246,0.3)' },
-  { key: 'Relapse', label: '🔄 Relapse', color: '#94a3b8', bg: 'rgba(100,116,139,0.15)',border: 'rgba(100,116,139,0.3)' },
+  { key: 'İpucu',  label: '💡 İpucu',  color: '#60a5fa', bg: 'rgba(59,130,246,0.15)',  border: 'rgba(59,130,246,0.3)' },
+  { key: 'Günlük', label: '📔 Günlük', color: '#a78bfa', bg: 'rgba(167,139,250,0.15)', border: 'rgba(167,139,250,0.3)' },
+  { key: 'Soru',   label: '❓ Soru',   color: '#fbbf24', bg: 'rgba(251,191,36,0.15)',  border: 'rgba(251,191,36,0.3)' },
+  { key: 'Başarı', label: '🏆 Başarı', color: '#4ade80', bg: 'rgba(34,197,94,0.15)',   border: 'rgba(34,197,94,0.3)' },
 ];
 
 export default function CreatePostModal({ visible, onClose, onSubmit }) {
   const [content, setContent] = useState('');
-  const [selectedType, setSelectedType] = useState('Tips');
+  const [selectedType, setSelectedType] = useState('İpucu');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -39,7 +39,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit }) {
     try {
       await onSubmit(content.trim(), selectedType);
       setContent('');
-      setSelectedType('Tips');
+      setSelectedType('İpucu');
       onClose();
     } catch (error) {
       Alert.alert('Hata', 'Post gönderilemedi. Lütfen tekrar dene.');
@@ -49,7 +49,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit }) {
 
   const handleClose = () => {
     setContent('');
-    setSelectedType('Tips');
+    setSelectedType('İpucu');
     onClose();
   };
 

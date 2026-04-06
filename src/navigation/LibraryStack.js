@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LibraryScreen from '../screens/LibraryScreen';
 import MeditationScreen from '../screens/MeditationScreen';
+import LeaderboardScreen from '../screens/LeaderboardScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -10,6 +11,7 @@ export default function LibraryStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="LibraryMain" component={LibraryScreen} />
       <Stack.Screen name="Meditation" component={MeditationScreen} />
+      <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
     </Stack.Navigator>
   );
 }

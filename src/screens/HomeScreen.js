@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Dimensions,
   Alert,
   Modal,
   TextInput,
@@ -17,69 +16,47 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStreak } from '../contexts/StreakContext';
 import { useAuth } from '../contexts/AuthContext';
 import PanicModal from '../components/PanicModal';
-import { getCurrentBadge } from '../utils/badgeData';
+import HeroBadgeCarousel from '../components/HeroBadgeCarousel';
+import { getCurrentBadge, badges } from '../utils/badgeData';
+import { db } from '../../config/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-const { width } = Dimensions.get('window');
+const MOTIVATIONAL_QUOTES = [
+  'Bugün bir başlangıç. Küçük adımlar, büyük değişimler yaratır.',
+  'Direneceğin her gün bir zafer. Düşündüğünden çok daha güçlüsün.',
+  'En zorlu savaşlar içinde kazanılır. Sen kazanıyorsun.',
+  'Gelecekteki sen, güçlü kaldığın her gün için sana teşekkür edecek.',
+  'İlerleme, mükemmellik değil. Devam et. Başarabilirsin.',
+  'Bu, büyük bir şeyin başlangıcı. Yolda kal.',
+  'Netlik, enerji, amaç — hepsi öte tarafta seni bekliyor.',
+];
 
-// Primary color - matching StatsScreen theme
-const PRIMARY = '#0df2a6';
-
-// Yıldız efekti için rastgele noktalar
 const generateStars = (count) => {
-  const stars = [];
+  const arr = [];
   for (let i = 0; i < count; i++) {
-    stars.push({
+    arr.push({
       id: i,
       left: Math.random() * 100,
       top: Math.random() * 100,
       size: Math.random() * 2 + 1,
-      opacity: Math.random() * 0.3 + 0.1,
+      opacity: Math.random() * 0.4 + 0.1,
     });
   }
-  return stars;
+  return arr;
 };
+const stars = generateStars(60);
 
-const stars = generateStars(50);
-
-// Week days component
-function WeekDayCircle({ day, label, isToday, isCompleted }) {
-  if (isToday) {
-    return (
-      <View style={styles.dayContainer}>
-        <View style={[styles.dayCircle, styles.dayCircleToday]}>
-          <Text style={styles.dayTodayText}>{day}</Text>
-        </View>
-        <Text style={styles.dayLabelToday}>{label}</Text>
-      </View>
-    );
-  }
-  
-  if (isCompleted) {
-    return (
-      <View style={styles.dayContainer}>
-        <View style={[styles.dayCircle, styles.dayCircleCompleted]}>
-          <Ionicons name="checkmark" size={14} color="#fff" style={{ fontWeight: 'bold' }} />
-        </View>
-        <Text style={styles.dayLabel}>{label}</Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.dayContainer}>
-      <View style={[styles.dayCircle, styles.dayCircleFuture]} />
-      <Text style={styles.dayLabelFuture}>{label}</Text>
-    </View>
-  );
+function formatPornFreeFor(timer) {
+  if (timer.days > 0) return `${timer.days}g`;
+  if (timer.hours > 0) return `${timer.hours}s`;
+  if (timer.minutes > 0) return `${timer.minutes}d`;
+  return `${timer.seconds}sn`;
 }
 
-// Action Button Component
-function ActionButton({ icon, label, color, onPress }) {
+function ActionButton({ icon, label, onPress }) {
   return (
-    <TouchableOpacity style={styles.actionButton} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.actionIconContainer}>
-        {icon}
-      </View>
+    <TouchableOpacity style={styles.actionButton} onPress={onPress} activeOpacity={0.75}>
+      <View style={styles.actionIconWrap}>{icon}</View>
       <Text style={styles.actionLabel}>{label}</Text>
     </TouchableOpacity>
   );
@@ -92,18 +69,42 @@ export default function HomeScreen({ navigation }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editDays, setEditDays] = useState('');
   const [editLoading, setEditLoading] = useState(false);
+  const [pledgeReason, setPledgeReason] = useState('');
+  const [showReasonModal, setShowReasonModal] = useState(false);
+  const [editReason, setEditReason] = useState('');
 
   const currentStreak = streakData?.currentStreak || 0;
   const currentBadge = getCurrentBadge(currentStreak);
+  const tilSober = Math.max(0, 90 - currentStreak);
+  const quote = MOTIVATIONAL_QUOTES[currentStreak % MOTIVATIONAL_QUOTES.length];
 
-  const handlePledge = () => {
-    navigation.navigate('Pledge');
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'pledges', user.uid));
+        if (snap.exists() && snap.data().reason) {
+          setPledgeReason(snap.data().reason);
+        }
+      } catch {}
+    })();
+  }, [user]);
+
+  const handleSaveReason = async () => {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, 'pledges', user.uid), { reason: editReason }, { merge: true });
+      setPledgeReason(editReason);
+      setShowReasonModal(false);
+    } catch {
+      Alert.alert('Hata', 'Kaydedilemedi. Tekrar dene.');
+    }
   };
 
   const handleEditStreak = async () => {
     const days = parseInt(editDays, 10);
     if (isNaN(days) || days < 0) {
-      Alert.alert('Invalid Input', 'Please enter a valid number of days (0 or more).');
+      Alert.alert('Geçersiz Giriş', '0 veya daha fazla geçerli bir gün sayısı girin.');
       return;
     }
     setEditLoading(true);
@@ -112,34 +113,14 @@ export default function HomeScreen({ navigation }) {
       setShowEditModal(false);
       setEditDays('');
     } catch {
-      Alert.alert('Error', 'Could not update streak. Try again.');
+      Alert.alert('Hata', 'Streak güncellenemedi. Tekrar dene.');
     }
     setEditLoading(false);
   };
 
-  // Get week days based on current day
-  const getWeekDays = () => {
-    const dayLabels = ['M', 'T', 'W', 'TH', 'F', 'S', 'S'];
-    const today = new Date().getDay();
-    const adjustedToday = today === 0 ? 6 : today - 1; // Monday = 0
-    
-    return dayLabels.map((label, index) => {
-      const isToday = index === adjustedToday;
-      const isCompleted = index < adjustedToday && currentStreak > 0;
-      const day = index === 3 ? 'TH' : label;
-      return { day, label, isToday, isCompleted };
-    });
-  };
-
-  const weekDays = getWeekDays();
-
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#0B1121', '#162035', '#1a2642']}
-        style={styles.gradient}
-      >
-        {/* Yıldız efekti */}
+      <LinearGradient colors={['#0B1121', '#162035', '#1a2642']} style={styles.gradient}>
         {stars.map((star) => (
           <View
             key={star.id}
@@ -156,176 +137,187 @@ export default function HomeScreen({ navigation }) {
           />
         ))}
 
-        <ScrollView 
-          style={styles.scrollView} 
+        <ScrollView
+          style={styles.scrollView}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
+          {/* ── Header ── */}
           <View style={styles.header}>
-            <Text style={styles.logo}>QUITTR</Text>
-            <View style={styles.headerPill}>
-              <View style={styles.streakBadge}>
-                <Ionicons name="flame" size={18} color="#f97316" />
-                <Text style={styles.streakText}>{currentStreak}</Text>
-              </View>
-              <View style={styles.headerIconsRight}>
-                <Ionicons name="gift-outline" size={18} color="#f472b6" />
-                <Ionicons name="flash" size={18} color="#facc15" />
-              </View>
+            <View>
+              <Text style={styles.logo}>QUITTR</Text>
+              <Text style={styles.headerMotto}>Ya bir gün, ya bugün.</Text>
+            </View>
+            <View style={styles.streakPill}>
+              <Ionicons name="flame" size={15} color="#0df2a6" />
+              <Text style={styles.streakPillText}>{currentStreak} G STREAK</Text>
             </View>
           </View>
 
-          {/* Weekly Calendar */}
-          <View style={styles.weekContainer}>
-            {weekDays.map((d, i) => (
-              <WeekDayCircle 
-                key={i} 
-                day={d.day}
-                label={d.label}
-                isToday={d.isToday}
-                isCompleted={d.isCompleted}
-              />
-            ))}
-          </View>
+          {/* ── Hero Badge Carousel ── */}
+          <HeroBadgeCarousel
+            badges={badges}
+            currentStreak={currentStreak}
+            currentBadge={currentBadge}
+            onNavigateToAll={() => navigation.navigate('Achievements')}
+            onLongPress={() => {
+              setEditDays(String(currentStreak));
+              setShowEditModal(true);
+            }}
+          />
 
-          {/* Main Medal Circle - Tıklanabilir */}
-          <TouchableOpacity 
-            style={styles.medalContainer}
-            onPress={() => navigation.navigate('Achievements')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.medalGlow} />
-            <LinearGradient
-              colors={currentBadge.colors}
-              style={styles.medalRing}
-            >
-              <View style={[styles.medalInner, { backgroundColor: currentBadge.bgColor }]}>
-                <View style={styles.medalInnerBorder} />
-                <View style={styles.medalShine} />
-                {currentBadge.iconType === 'material' ? (
-                  <MaterialCommunityIcons 
-                    name={currentBadge.icon} 
-                    size={70} 
-                    color={currentBadge.iconColor} 
-                    style={styles.medalIcon} 
-                  />
-                ) : (
-                  <Ionicons 
-                    name={currentBadge.icon} 
-                    size={70} 
-                    color={currentBadge.iconColor} 
-                    style={styles.medalIcon} 
-                  />
-                )}
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+          {/* ── Motto under badge ── */}
+          <Text style={styles.mottoText}>Ya bir gün, ya bugün.</Text>
 
-          {/* Timer Info */}
-          <View style={styles.timerInfo}>
-            <Text style={styles.timerLabel}>You've been porn-free for:</Text>
-            {/* Milestone badge */}
-            {[7, 30, 90].includes(currentStreak) && (
-              <View style={styles.milestoneBadge}>
-                <Text style={styles.milestoneBadgeText}>
-                  🏆 {currentStreak} Day Milestone!
-                </Text>
-              </View>
-            )}
-            <View style={styles.timerValueRow}>
-              <Text style={styles.timerValue}>{currentStreak}</Text>
-              <Text style={styles.timerUnit}>days</Text>
+          {/* ── Stats Row ── */}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Nüks</Text>
+              <Text style={styles.statValue}>{streakData?.relapses || 0}</Text>
             </View>
-            <View style={styles.timerBadge}>
-              <Ionicons name="time-outline" size={14} color={PRIMARY} />
-              <Text style={styles.timerBadgeText}>
-                {timer.hours}h {timer.minutes}m {timer.seconds}s
-              </Text>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Temiz Süre</Text>
+              <Text style={[styles.statValue, { color: '#0df2a6' }]}>{formatPornFreeFor(timer)}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Hedef</Text>
+              <Text style={styles.statValue}>{tilSober}g</Text>
             </View>
           </View>
 
-          {/* Quick Actions */}
-          <View style={styles.actionsContainer}>
+          {/* ── Action Buttons ── */}
+          <View style={styles.actionsRow}>
             <ActionButton
-              icon={<MaterialCommunityIcons name="handshake" size={24} color="#0df2a6" />}
-              label="Pledge"
-              onPress={handlePledge}
+              icon={<MaterialCommunityIcons name="hand-back-left" size={24} color="#a78bfa" />}
+              label="Söz Ver"
+              onPress={() => navigation.navigate('Pledge')}
             />
             <ActionButton
-              icon={<MaterialCommunityIcons name="meditation" size={24} color="#0df2a6" />}
-              label="Meditate"
+              icon={<MaterialCommunityIcons name="meditation" size={24} color="#60a5fa" />}
+              label="Meditasyon"
               onPress={() => navigation.navigate('Meditation')}
             />
             <ActionButton
-              icon={<Ionicons name="refresh" size={24} color="#0df2a6" />}
-              label="Reset"
+              icon={<Ionicons name="refresh-circle" size={26} color="#f87171" />}
+              label="Sıfırla"
               onPress={() =>
                 Alert.alert(
-                  'Reset Streak',
-                  'Are you sure you want to reset your streak? This will record a relapse.',
+                  'Streak Sıfırla',
+                  'Streak\'ini sıfırlamak istediğinden emin misin? Bu bir nüks olarak kaydedilecek.\n\nYa bir gün, ya bugün.',
                   [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Reset', style: 'destructive', onPress: resetStreak },
+                    { text: 'Vazgeç', style: 'cancel' },
+                    { text: 'Sıfırla', style: 'destructive', onPress: resetStreak },
                   ]
                 )
               }
             />
             <ActionButton
-              icon={<Ionicons name="pencil" size={22} color="#9ca3af" />}
-              label="Edit Streak"
-              onPress={() => {
-                setEditDays(String(currentStreak));
-                setShowEditModal(true);
-              }}
+              icon={<Ionicons name="person" size={24} color="#c084fc" />}
+              label="Melius"
+              onPress={() => Alert.alert('Yakında', 'AI Terapist özelliği çok yakında geliyor.')}
             />
           </View>
 
-          {/* Brain Rewiring Progress */}
-          <View style={styles.progressCard}>
-            <View style={styles.progressHeader}>
-              <View style={styles.progressHeaderLeft}>
-                <View style={styles.progressIconBg}>
-                  <MaterialCommunityIcons name="brain" size={20} color="#06b6d4" />
-                </View>
-                <Text style={styles.progressLabel}>Brain Rewiring</Text>
-              </View>
-              <Text style={styles.progressValue}>{brainRewiring}%</Text>
-            </View>
-            <View style={styles.progressBar}>
+          {/* ── Zihin Gelişimi Bar ── */}
+          <View style={styles.brainRow}>
+            <Text style={styles.brainLabel}>Zihin Gelişimi</Text>
+            <View style={styles.brainTrack}>
               <LinearGradient
                 colors={['#0df2a6', '#06b6d4']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={[styles.progressFill, { width: `${brainRewiring}%` }]}
+                style={[styles.brainFill, { width: `${Math.max(brainRewiring, 2)}%` }]}
               />
             </View>
-            <Text style={styles.progressSubtext}>Estimated full recovery: 90 days</Text>
+            <Text style={styles.brainPct}>{brainRewiring}%</Text>
           </View>
 
-          {/* Panic Button */}
-          <TouchableOpacity 
-            style={styles.panicButton}
-            onPress={() => setShowPanicModal(true)}
-            activeOpacity={0.8}
+          {/* ── Quote Card ── */}
+          <View style={styles.quoteCard}>
+            <Text style={styles.quoteOpenMark}>{'\u201C\u201C'}</Text>
+            <Text style={styles.quoteText}>{quote}</Text>
+            <Text style={styles.quoteCloseMark}>{'\u201D\u201D'}</Text>
+          </View>
+
+          {/* ── Engellenen Siteler Stub ── */}
+          <TouchableOpacity
+            style={styles.listCard}
+            activeOpacity={0.75}
+            onPress={() => Alert.alert('Yakında', 'Site engelleme özelliği çok yakında geliyor.')}
           >
-            <View style={styles.panicButtonInner}>
-              <Ionicons name="warning" size={22} color="#fff" />
-              <Text style={styles.panicText}>PANIC BUTTON</Text>
+            <View style={styles.listCardLeft}>
+              <View style={styles.listCardIconRed}>
+                <Ionicons name="ban" size={22} color="#ef4444" />
+              </View>
+              <View>
+                <Text style={styles.listCardTitle}>Engellenen Siteler</Text>
+                <Text style={styles.listCardSub}>Engellemek istediklerini seç</Text>
+              </View>
             </View>
+            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
           </TouchableOpacity>
 
-          {/* Bottom spacing for tab bar */}
-          <View style={{ height: 120 }} />
+          {/* ── Günlük ── */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Günlük</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addNewBtn}
+            activeOpacity={0.8}
+            onPress={() => Alert.alert('Yakında', 'Günlük özelliği çok yakında geliyor.')}
+          >
+            <Ionicons name="add-circle" size={20} color="#fff" />
+            <Text style={styles.addNewText}>Yeni Ekle</Text>
+          </TouchableOpacity>
+
+          {/* ── Neden Bırakıyorum ── */}
+          <View style={styles.whyCard}>
+            <View style={styles.whyCardHeader}>
+              <View style={styles.whyCardLeft}>
+                <View style={styles.whyIconWrap}>
+                  <Ionicons name="help" size={14} color="#9ca3af" />
+                </View>
+                <Text style={styles.whyCardLabel}>Neden Bırakıyorum</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setEditReason(pledgeReason);
+                  setShowReasonModal(true);
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="pencil" size={16} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.whyText}>
+              {pledgeReason ? `\u2018${pledgeReason}\u2019` : 'Sebebini yazmak için kaleme dokun...'}
+            </Text>
+            <View style={styles.whyBestRow}>
+              <Ionicons name="star-outline" size={13} color="#facc15" />
+              <Text style={styles.whyBestText}>En iyi {streakData?.longestStreak || 0} gün</Text>
+            </View>
+          </View>
+
+          {/* Bottom spacer: panic button height + gap + tab bar */}
+          <View style={{ height: 160 }} />
         </ScrollView>
 
-        {/* Panic Modal */}
-        <PanicModal
-          visible={showPanicModal}
-          onClose={() => setShowPanicModal(false)}
-        />
+        {/* ── Acil Durum Butonu (her zaman görünür) ── */}
+        <TouchableOpacity
+          style={styles.stickyPanicButton}
+          onPress={() => setShowPanicModal(true)}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="alert-circle" size={22} color="#fff" />
+          <Text style={styles.panicText}>Acil Durum</Text>
+        </TouchableOpacity>
 
-        {/* Edit Streak Modal */}
+        {/* ── Modals ── */}
+        <PanicModal visible={showPanicModal} onClose={() => setShowPanicModal(false)} />
+
+        {/* Streak Düzenle Modal */}
         <Modal
           visible={showEditModal}
           transparent
@@ -336,35 +328,76 @@ export default function HomeScreen({ navigation }) {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.modalOverlay}
           >
-            <View style={styles.editModal}>
-              <Text style={styles.editModalTitle}>Edit Streak</Text>
-              <Text style={styles.editModalSubtitle}>
-                Correct your streak if it's inaccurate. Enter the actual number of days.
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Streak Düzenle</Text>
+              <Text style={styles.modalSubtitle}>
+                Streak'in yanlışsa düzelt. Gerçek gün sayısını gir.
               </Text>
               <TextInput
-                style={styles.editModalInput}
+                style={styles.modalInput}
                 value={editDays}
                 onChangeText={setEditDays}
                 keyboardType="number-pad"
-                placeholder="Days"
+                placeholder="Gün"
                 placeholderTextColor="#6b7280"
                 maxLength={4}
               />
-              <View style={styles.editModalActions}>
+              <View style={styles.modalActions}>
                 <TouchableOpacity
-                  style={styles.editModalCancel}
+                  style={styles.modalCancelBtn}
                   onPress={() => setShowEditModal(false)}
                 >
-                  <Text style={styles.editModalCancelText}>Cancel</Text>
+                  <Text style={styles.modalCancelText}>Vazgeç</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.editModalConfirm, editLoading && { opacity: 0.6 }]}
+                  style={[styles.modalConfirmBtn, editLoading && { opacity: 0.6 }]}
                   onPress={handleEditStreak}
                   disabled={editLoading}
                 >
-                  <Text style={styles.editModalConfirmText}>
-                    {editLoading ? 'Saving...' : 'Save'}
-                  </Text>
+                  <Text style={styles.modalConfirmText}>{editLoading ? 'Kaydediliyor...' : 'Kaydet'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        {/* Neden Bırakıyorum Modal */}
+        <Modal
+          visible={showReasonModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowReasonModal(false)}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.modalOverlay}
+          >
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Neden Bırakıyorum</Text>
+              <Text style={styles.modalSubtitle}>
+                Zor anlarda güçlü kalmak için kişisel sebebini yaz.
+              </Text>
+              <TextInput
+                style={[
+                  styles.modalInput,
+                  { fontSize: 15, minHeight: 80, textAlignVertical: 'top', paddingTop: 14 },
+                ]}
+                value={editReason}
+                onChangeText={setEditReason}
+                placeholder="Sebebim..."
+                placeholderTextColor="#6b7280"
+                multiline
+                maxLength={200}
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => setShowReasonModal(false)}
+                >
+                  <Text style={styles.modalCancelText}>Vazgeç</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleSaveReason}>
+                  <Text style={styles.modalConfirmText}>Kaydet</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -376,286 +409,188 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  star: {
-    position: 'absolute',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 48,
-  },
+  container: { flex: 1 },
+  gradient: { flex: 1 },
+  star: { position: 'absolute', backgroundColor: '#fff', borderRadius: 10 },
+  scrollView: { flex: 1 },
+  content: { paddingHorizontal: 20, paddingTop: 52 },
+
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
-    paddingTop: 12,
+    marginBottom: 16,
   },
   logo: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
     color: '#fff',
     letterSpacing: 4,
   },
-  headerPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1e2738',
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+  headerMotto: {
+    color: 'rgba(255,255,255,0.28)',
+    fontSize: 10,
+    fontWeight: '400',
+    letterSpacing: 1.2,
+    fontStyle: 'italic',
+    marginTop: 2,
   },
-  streakBadge: {
+  streakPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 999,
+    gap: 5,
+    backgroundColor: 'rgba(13, 242, 166, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(13, 242, 166, 0.25)',
+    borderRadius: 20,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
-  streakText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  headerIconsRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingRight: 12,
-    paddingLeft: 4,
-  },
-  weekContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginBottom: 16,
-    paddingVertical: 24,
-  },
-  dayContainer: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  dayCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dayCircleCompleted: {
-    backgroundColor: '#0df2a6',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    shadowColor: '#0df2a6',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  dayCircleToday: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#0df2a6',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-    shadowColor: '#0df2a6',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  dayCircleFuture: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#374151',
-  },
-  dayTodayText: {
-    color: '#fff',
+  streakPillText: {
+    color: '#0df2a6',
     fontSize: 12,
     fontWeight: '700',
-  },
-  dayLabel: {
-    color: '#9ca3af',
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  dayLabelToday: {
-    color: '#0df2a6',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  dayLabelFuture: {
-    color: '#4b5563',
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  medalContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-  },
-  medalGlow: {
-    position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: 'rgba(13, 242, 166, 0.15)',
-  },
-  medalRing: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    padding: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.9,
-    shadowRadius: 28,
-    elevation: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: '#4b5563',
-  },
-  medalInner: {
-    flex: 1,
-    borderRadius: 110,
-    backgroundColor: '#1a1a2e',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 9,
-    overflow: 'hidden',
-  },
-  medalInnerBorder: {
-    position: 'absolute',
-    top: 11,
-    left: 11,
-    right: 11,
-    bottom: 11,
-    borderRadius: 110,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    opacity: 0.3,
-  },
-  medalShine: {
-    position: 'absolute',
-    top: -65,
-    left: -65,
-    width: 165,
-    height: 165,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 82,
-    transform: [{ rotate: '45deg' }],
-  },
-  medalIcon: {
-    opacity: 0.9,
-    zIndex: 10,
-  },
-  timerInfo: {
-    alignItems: 'center',
-    marginTop: 20,
-    paddingHorizontal: 16,
-  },
-  milestoneBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(250, 204, 21, 0.12)',
-    borderRadius: 99,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(250, 204, 21, 0.3)',
-  },
-  milestoneBadgeText: {
-    color: '#facc15',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  timerLabel: {
-    color: '#9ca3af',
-    fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  timerValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  timerValue: {
-    color: '#fff',
-    fontSize: 56,
-    fontWeight: '900',
-    letterSpacing: -2,
-  },
-  timerUnit: {
-    color: '#6b7280',
-    fontSize: 28,
-    fontWeight: '400',
-    marginLeft: 4,
-  },
-  timerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: '#0f1522',
-    borderWidth: 1,
-    borderColor: 'rgba(13, 242, 166, 0.3)',
-  },
-  timerBadgeText: {
-    color: '#d1d5db',
-    fontSize: 14,
-    fontWeight: '500',
     letterSpacing: 1,
   },
-  actionsContainer: {
+
+  // Motto under badge
+  mottoText: {
+    color: 'rgba(255,255,255,0.22)',
+    fontSize: 11,
+    fontWeight: '400',
+    letterSpacing: 1.5,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: -4,
+    marginBottom: 12,
+  },
+
+  // Main Badge
+  mainBadgeCenter: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  mainBadgeWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainBadgeOuterGlow: {
+    position: 'absolute',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: 'rgba(13, 242, 166, 0.05)',
+  },
+  mainBadgeGlow: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(13, 242, 166, 0.08)',
+  },
+  mainBadgeRing: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    padding: 5,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.8,
+    shadowRadius: 24,
+  },
+  mainBadgeInner: {
+    flex: 1,
+    borderRadius: 85,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  badgeShine: {
+    position: 'absolute',
+    top: -55,
+    left: -55,
+    width: 140,
+    height: 140,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 70,
+    transform: [{ rotate: '45deg' }],
+  },
+
+  // Badge Info
+  badgeInfo: {
+    alignItems: 'center',
+    marginBottom: 22,
+    gap: 2,
+  },
+  badgeName: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  badgeDays: {
+    color: '#9ca3af',
+    fontSize: 15,
+    fontWeight: '400',
+  },
+
+  // Stats Row
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(13,242,166,0.04)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(13,242,166,0.12)',
+    paddingVertical: 18,
+    marginBottom: 22,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statLabel: {
+    color: '#9ca3af',
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  statValue: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginVertical: 2,
+  },
+
+  // Action Buttons
+  actionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
-    paddingHorizontal: 0,
+    marginBottom: 24,
+    paddingHorizontal: 4,
   },
-  actionButton: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#1e2738',
+  actionButton: { alignItems: 'center', gap: 8 },
+  actionIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(13,242,166,0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(13,242,166,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.35,
     shadowRadius: 8,
     elevation: 4,
   },
@@ -664,126 +599,317 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
-  progressCard: {
-    backgroundColor: '#1a2332',
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 32,
-    borderWidth: 1,
-    borderColor: 'rgba(13, 242, 166, 0.2)',
-    position: 'relative',
-    overflow: 'hidden',
+
+  // Horizontal Achievements
+  achievementsSection: {
+    marginBottom: 24,
   },
-  progressHeader: {
+  achievementsHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  progressHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  progressIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: 'rgba(6, 182, 212, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(6, 182, 212, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressLabel: {
-    color: '#e5e7eb',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  progressValue: {
-    color: '#0df2a6',
-    fontSize: 14,
+  achievementsTitle: {
+    color: '#f3f4f6',
+    fontSize: 17,
     fontWeight: '700',
   },
-  progressBar: {
-    height: 12,
-    backgroundColor: '#0B1121',
+  achievementsScroll: {
+    paddingVertical: 4,
+    gap: 14,
+  },
+  achieveBadge: {
+    alignItems: 'center',
+    gap: 6,
+    width: 72,
+  },
+  achieveBadgeCurrentRing: {
+    borderRadius: 36,
+    borderWidth: 2,
+    borderColor: '#0df2a6',
+    padding: 2,
+  },
+  achieveBadgeRing: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    padding: 3,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
+  achieveBadgeInner: {
+    flex: 1,
+    borderRadius: 27,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  achieveBadgeName: {
+    color: '#d1d5db',
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  achieveBadgeNameDim: {
+    color: '#4b5563',
+  },
+  achieveBadgeDaysText: {
+    color: '#0df2a6',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  achieveBadgeDaysDim: {
+    color: '#6b7280',
+  },
+
+  // Brain Rewiring
+  brainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+    paddingHorizontal: 2,
+  },
+  brainLabel: {
+    color: '#9ca3af',
+    fontSize: 12,
+    fontWeight: '500',
+    minWidth: 100,
+  },
+  brainTrack: {
+    flex: 1,
+    height: 6,
+    backgroundColor: 'rgba(13,242,166,0.08)',
     borderRadius: 999,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
   },
-  progressFill: {
+  brainFill: {
     height: '100%',
     borderRadius: 999,
-    shadowColor: '#06b6d4',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 4,
   },
-  progressSubtext: {
-    color: '#6b7280',
-    fontSize: 10,
-    fontWeight: '500',
+  brainPct: {
+    color: '#0df2a6',
+    fontSize: 12,
+    fontWeight: '600',
+    minWidth: 30,
     textAlign: 'right',
-    marginTop: 10,
   },
-  panicButton: {
-    backgroundColor: '#dc2626',
-    borderRadius: 12,
-    marginTop: 32,
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 25,
-    elevation: 8,
+
+  // Quote Card
+  quoteCard: {
+    backgroundColor: 'rgba(13,242,166,0.03)',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(248, 113, 113, 0.3)',
-    overflow: 'hidden',
+    borderColor: 'rgba(13,242,166,0.1)',
+    padding: 22,
+    marginBottom: 14,
   },
-  panicButtonInner: {
+  quoteOpenMark: {
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: 26,
+    lineHeight: 20,
+    marginBottom: 6,
+    fontWeight: '900',
+  },
+  quoteText: {
+    color: '#e5e7eb',
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '400',
+    textAlign: 'center',
+  },
+  quoteCloseMark: {
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: 26,
+    lineHeight: 14,
+    marginTop: 6,
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+
+  // Websites Blocked Card
+  listCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  listCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    flex: 1,
+  },
+  listCardIconRed: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listCardTitle: {
+    color: '#f3f4f6',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  listCardSub: {
+    color: '#9ca3af',
+    fontSize: 12,
+  },
+
+  // Journal
+  sectionHeader: { marginBottom: 12 },
+  sectionTitle: {
+    color: '#f3f4f6',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  addNewBtn: {
+    backgroundColor: 'rgba(13,242,166,0.1)',
+    borderRadius: 14,
+    paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 20,
-    gap: 12,
+    gap: 8,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(13,242,166,0.3)',
+    shadowColor: '#0df2a6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  addNewText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // Why I'm Quitting
+  whyCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 18,
+    marginBottom: 20,
+    gap: 10,
+  },
+  whyCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  whyCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  whyIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  whyCardLabel: {
+    color: '#9ca3af',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  whyText: {
+    color: '#e5e7eb',
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 22,
+  },
+  whyBestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  whyBestText: {
+    color: '#facc15',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Sticky Panic Button
+  stickyPanicButton: {
+    position: 'absolute',
+    bottom: 88,
+    left: 20,
+    right: 20,
+    backgroundColor: '#dc2626',
+    borderRadius: 16,
+    paddingVertical: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(248,113,113,0.25)',
   },
   panicText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 1,
   },
+
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.75)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 28,
   },
-  editModal: {
-    backgroundColor: '#1a2332',
-    borderRadius: 20,
+  modalCard: {
+    backgroundColor: '#141f33',
+    borderRadius: 22,
     padding: 28,
     width: '100%',
     borderWidth: 1,
-    borderColor: 'rgba(13,242,166,0.2)',
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  editModalTitle: {
+  modalTitle: {
     color: '#fff',
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 8,
   },
-  editModalSubtitle: {
+  modalSubtitle: {
     color: '#9ca3af',
     fontSize: 13,
     lineHeight: 19,
     marginBottom: 20,
   },
-  editModalInput: {
-    backgroundColor: '#0f1522',
+  modalInput: {
+    backgroundColor: '#0b1221',
     color: '#fff',
     borderRadius: 12,
     paddingHorizontal: 16,
@@ -792,14 +918,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(13,242,166,0.3)',
+    borderColor: 'rgba(255,255,255,0.12)',
     marginBottom: 20,
   },
-  editModalActions: {
+  modalActions: {
     flexDirection: 'row',
     gap: 12,
   },
-  editModalCancel: {
+  modalCancelBtn: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
@@ -807,19 +933,19 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
   },
-  editModalCancelText: {
+  modalCancelText: {
     color: '#9ca3af',
     fontSize: 15,
     fontWeight: '600',
   },
-  editModalConfirm: {
+  modalConfirmBtn: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
     backgroundColor: '#0df2a6',
     alignItems: 'center',
   },
-  editModalConfirmText: {
+  modalConfirmText: {
     color: '#0a0e27',
     fontSize: 15,
     fontWeight: '700',

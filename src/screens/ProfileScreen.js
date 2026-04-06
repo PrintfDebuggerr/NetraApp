@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useStreak } from '../contexts/StreakContext';
+import { getCurrentBadge } from '../utils/badgeData';
 
 const PRIMARY = '#0df2a6';
 
@@ -56,7 +57,7 @@ function AchievementBadge({ icon, label, isUnlocked, gradientColors }) {
           {icon}
         </View>
       </View>
-      <Text style={styles.achievementLabelLocked}>Locked</Text>
+      <Text style={styles.achievementLabelLocked}>Kilitli</Text>
     </View>
   );
 }
@@ -103,9 +104,9 @@ export default function ProfileScreen({ navigation }) {
 
   const currentStreak = streakData?.currentStreak || 0;
   const longestStreak = streakData?.longestStreak || 0;
-  const xp = currentStreak * 10 + longestStreak * 5;
   const daysToSober = Math.max(0, 90 - currentStreak);
-  const userName = user?.email?.split('@')[0] || 'User';
+  const userName = user?.email?.split('@')[0] || 'Kullanıcı';
+  const currentBadge = getCurrentBadge(currentStreak);
 
   return (
     <View style={styles.container}>
@@ -132,9 +133,9 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={styles.headerTitle}>Profil</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-            <Text style={styles.settingsLink}>SETTINGS</Text>
+            <Text style={styles.settingsLink}>AYARLAR</Text>
           </TouchableOpacity>
         </View>
 
@@ -159,7 +160,7 @@ export default function ProfileScreen({ navigation }) {
               </View>
             </View>
             <Text style={styles.userName}>@{userName}</Text>
-            <Text style={styles.userTitle}>RECOVERY WARRIOR</Text>
+            <Text style={styles.userTitle}>DİSİPLİN YOLUNDA</Text>
 
             {/* Status Chips */}
             <View style={styles.statusChips}>
@@ -168,14 +169,14 @@ export default function ProfileScreen({ navigation }) {
                 style={styles.statusChip}
               >
                 <Ionicons name="flame" size={20} color="#fb923c" />
-                <Text style={styles.statusChipText}>{currentStreak} Days</Text>
+                <Text style={styles.statusChipText}>{currentStreak} Günlük Seri</Text>
               </LinearGradient>
               <LinearGradient
                 colors={['rgba(59, 130, 246, 0.2)', 'rgba(13, 204, 242, 0.2)']}
-                style={styles.statusChip}
+                style={[styles.statusChip, { borderColor: 'rgba(59, 130, 246, 0.3)' }]}
               >
                 <Ionicons name="diamond" size={20} color={PRIMARY} />
-                <Text style={styles.statusChipTextBlue}>{xp} XP</Text>
+                <Text style={styles.statusChipTextBlue}>Seviye: {currentBadge?.name || 'Başlangıç'}</Text>
               </LinearGradient>
             </View>
           </View>
@@ -183,9 +184,9 @@ export default function ProfileScreen({ navigation }) {
           {/* Achievements Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Achievements</Text>
-              <TouchableOpacity>
-                <Text style={styles.viewAllText}>VIEW ALL</Text>
+              <Text style={styles.sectionTitle}>Rozetler</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Achievements')}>
+                <Text style={styles.viewAllText}>TÜMÜNÜ GÖR</Text>
               </TouchableOpacity>
             </View>
             <ScrollView 
@@ -195,31 +196,31 @@ export default function ProfileScreen({ navigation }) {
             >
               <AchievementBadge
                 icon={<Ionicons name="trophy" size={28} color="#facc15" />}
-                label="First Week"
+                label="İlk Hafta"
                 isUnlocked={currentStreak >= 7}
                 gradientColors={['#facc15', '#ea580c']}
               />
               <AchievementBadge
                 icon={<MaterialCommunityIcons name="brain" size={28} color={PRIMARY} />}
-                label="Mindful"
+                label="Bilinçli"
                 isUnlocked={currentStreak >= 14}
                 gradientColors={['#60a5fa', PRIMARY]}
               />
               <AchievementBadge
                 icon={<Ionicons name="medal" size={28} color="#c084fc" />}
-                label="30 Days"
+                label="30 Gün"
                 isUnlocked={currentStreak >= 30}
                 gradientColors={['#a855f7', '#6366f1']}
               />
               <AchievementBadge
                 icon={<Ionicons name="ribbon" size={28} color="#fb923c" />}
-                label="60 Days"
+                label="60 Gün"
                 isUnlocked={currentStreak >= 60}
                 gradientColors={['#f97316', '#ef4444']}
               />
               <AchievementBadge
                 icon={<Ionicons name="star" size={28} color="#fbbf24" />}
-                label="90 Days"
+                label="90 Gün"
                 isUnlocked={currentStreak >= 90}
                 gradientColors={['#f59e0b', '#10b981']}
               />
@@ -236,8 +237,8 @@ export default function ProfileScreen({ navigation }) {
             >
               <View style={styles.progressCTAContent}>
                 <View>
-                  <Text style={styles.progressCTATitle}>View Progress Card</Text>
-                  <Text style={styles.progressCTASubtitle}>Detailed analytics & insights</Text>
+                  <Text style={styles.progressCTATitle}>Detaylı Analizi Gör</Text>
+                  <Text style={styles.progressCTASubtitle}>Detaylı analiz ve veriler</Text>
                 </View>
                 <View style={styles.progressCTAIcon}>
                   <Ionicons name="arrow-forward" size={24} color="#fff" />
@@ -254,9 +255,9 @@ export default function ProfileScreen({ navigation }) {
               </View>
               <View>
                 <Text style={styles.statValue}>
-                  {longestStreak} <Text style={styles.statUnit}>days</Text>
+                  {longestStreak} <Text style={styles.statUnit}>gün</Text>
                 </Text>
-                <Text style={styles.statLabel}>BEST RECORD</Text>
+                <Text style={styles.statLabel}>EN İYİ SERİ</Text>
               </View>
             </View>
             <View style={styles.statCard}>
@@ -265,9 +266,9 @@ export default function ProfileScreen({ navigation }) {
               </View>
               <View>
                 <Text style={styles.statValue}>
-                  {daysToSober} <Text style={styles.statUnit}>days</Text>
+                  {daysToSober} <Text style={styles.statUnit}>gün</Text>
                 </Text>
-                <Text style={styles.statLabel}>TIL SOBER</Text>
+                <Text style={styles.statLabel}>HEDEF SÜRE</Text>
               </View>
             </View>
           </View>
@@ -278,9 +279,9 @@ export default function ProfileScreen({ navigation }) {
             <View style={styles.inviteCardContent}>
               <View style={styles.inviteCardHeader}>
                 <View style={styles.inviteCardText}>
-                  <Text style={styles.inviteCardTitle}>Invite Your Friends</Text>
+                  <Text style={styles.inviteCardTitle}>Arkadaşlarını Davet Et</Text>
                   <Text style={styles.inviteCardSubtitle}>
-                    Recovery is stronger together. Get premium features for every invite.
+                    Birlikte daha güçlüyüz. Her davette ekstra özellikler kazan.
                   </Text>
                 </View>
                 <View style={styles.inviteCardIconBg}>
@@ -289,7 +290,7 @@ export default function ProfileScreen({ navigation }) {
               </View>
               <TouchableOpacity style={styles.inviteButton}>
                 <Ionicons name="share-outline" size={18} color="#e9d5ff" />
-                <Text style={styles.inviteButtonText}>Share Invite</Text>
+                <Text style={styles.inviteButtonText}>Davet Gönder</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -299,8 +300,8 @@ export default function ProfileScreen({ navigation }) {
             <SettingsItem
               icon={<Ionicons name="shield-checkmark" size={20} color="#60a5fa" />}
               iconBgColor="rgba(59, 130, 246, 0.1)"
-              title="Internet Filter"
-              subtitle="Block adult content"
+              title="İnternet Filtresi"
+              subtitle="Uygunsuz içerikleri engelle"
               hasToggle={true}
               toggleValue={internetFilter}
               onToggle={setInternetFilter}
@@ -309,20 +310,20 @@ export default function ProfileScreen({ navigation }) {
             <SettingsItem
               icon={<Ionicons name="options" size={20} color="#d1d5db" />}
               iconBgColor="rgba(107, 114, 128, 0.1)"
-              title="App Preferences"
+              title="Uygulama Ayarları"
             />
             <View style={styles.settingsDivider} />
             <SettingsItem
               icon={<Ionicons name="help-circle" size={20} color="#d1d5db" />}
               iconBgColor="rgba(107, 114, 128, 0.1)"
-              title="Help & Support"
+              title="Yardım & Destek"
             />
           </View>
 
           {/* Logout Button */}
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color="#f87171" />
-            <Text style={styles.logoutText}>Log Out</Text>
+            <Text style={styles.logoutText}>Çıkış Yap</Text>
           </TouchableOpacity>
 
           {/* Bottom spacing for tab bar */}

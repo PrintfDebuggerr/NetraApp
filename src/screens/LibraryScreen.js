@@ -29,10 +29,10 @@ const SOUND_SOURCES = {
 };
 
 const SOUNDS = [
-  { key: 'rain',   label: 'Rain',        icon: 'rainy',     lib: 'Ionicons', color: '#93c5fd' },
-  { key: 'forest', label: 'Forest',      icon: 'pine-tree', lib: 'Material', color: '#4ade80' },
-  { key: 'noise',  label: 'White Noise', icon: 'waveform',  lib: 'Material', color: '#d1d5db' },
-  { key: 'ocean',  label: 'Ocean',       icon: 'water',     lib: 'Ionicons', color: '#38bdf8' },
+  { key: 'rain',   label: 'Yağmur',        icon: 'rainy',     lib: 'Ionicons', color: '#93c5fd' },
+  { key: 'forest', label: 'Orman',         icon: 'pine-tree', lib: 'Material', color: '#4ade80' },
+  { key: 'noise',  label: 'Beyaz Gürültü', icon: 'waveform',  lib: 'Material', color: '#d1d5db' },
+  { key: 'ocean',  label: 'Okyanus',       icon: 'water',     lib: 'Ionicons', color: '#38bdf8' },
 ];
 
 const TIMER_OPTIONS = [
@@ -129,7 +129,7 @@ export default function LibraryScreen({ navigation }) {
         stopTimerRef.current = setTimeout(stopSound, timerOption.seconds * 1000);
       }
     } catch {
-      Alert.alert('Playback Error', 'Could not play this sound.');
+      Alert.alert('Hata', 'Bu ses çalınamadı.');
     }
     setIsLoading(false);
   };
@@ -176,9 +176,9 @@ export default function LibraryScreen({ navigation }) {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Library</Text>
+            <Text style={styles.headerTitle}>Kütüphane</Text>
             <TouchableOpacity style={styles.websiteButton}>
-              <Text style={styles.websiteButtonText}>Website</Text>
+              <Text style={styles.websiteButtonText}>Web Sitesi</Text>
             </TouchableOpacity>
           </View>
 
@@ -192,7 +192,7 @@ export default function LibraryScreen({ navigation }) {
               <View style={styles.quickActionIcon}>
                 <MaterialCommunityIcons name="weather-windy" size={28} color="#a5f3fc" />
               </View>
-              <Text style={styles.quickActionLabel}>Breathing</Text>
+              <Text style={styles.quickActionLabel}>Nefes Egzersizi</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickActionButton}
@@ -202,7 +202,7 @@ export default function LibraryScreen({ navigation }) {
               <View style={styles.quickActionIcon}>
                 <MaterialCommunityIcons name="meditation" size={28} color="#bfdbfe" />
               </View>
-              <Text style={styles.quickActionLabel}>Meditate</Text>
+              <Text style={styles.quickActionLabel}>Meditasyon</Text>
             </TouchableOpacity>
           </View>
 
@@ -210,21 +210,21 @@ export default function LibraryScreen({ navigation }) {
           <TouchableOpacity
             style={styles.leaderboardCard}
             activeOpacity={0.7}
-            onPress={() => Alert.alert('Yakında', 'Leaderboard özelliği geliyor.')}
+            onPress={() => navigation.navigate('Leaderboard')}
           >
             <View style={styles.leaderboardIconBg}>
               <Ionicons name="trophy" size={24} color="#facc15" />
             </View>
             <View style={styles.leaderboardText}>
-              <Text style={styles.leaderboardTitle}>Leaderboard</Text>
-              <Text style={styles.leaderboardSubtitle}>Topluluk Sıralaması</Text>
+              <Text style={styles.leaderboardTitle}>Sıralama</Text>
+              <Text style={styles.leaderboardSubtitle}>Topluluk</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#4b5563" />
           </TouchableOpacity>
 
           {/* ── Relaxation Noises ── */}
           <View style={styles.relaxationSection}>
-            <Text style={styles.sectionTitle}>Relaxation Noises</Text>
+            <Text style={styles.sectionTitle}>Rahatlatıcı Sesler</Text>
 
                     <View style={styles.soundsGrid}>
               {SOUNDS.map((s) => {
@@ -270,7 +270,7 @@ export default function LibraryScreen({ navigation }) {
               <View style={[styles.controlsCard, { borderColor: activeSound?.color + '44' }]}>
                 {/* Volume row */}
                 <View style={styles.controlRow}>
-                  <Text style={styles.controlLabel}>Volume</Text>
+                  <Text style={styles.controlLabel}>Ses</Text>
                   <View style={styles.volumeRow}>
                     <TouchableOpacity
                       style={styles.volBtn}
@@ -305,7 +305,7 @@ export default function LibraryScreen({ navigation }) {
 
                 {/* Timer row */}
                 <View style={styles.controlRow}>
-                  <Text style={styles.controlLabel}>Timer</Text>
+                  <Text style={styles.controlLabel}>Süre</Text>
                   <View style={styles.timerOptions}>
                     {TIMER_OPTIONS.map((opt, idx) => (
                       <TouchableOpacity
@@ -346,11 +346,11 @@ export default function LibraryScreen({ navigation }) {
               </View>
             </LinearGradient>
             <View style={styles.communityTextContainer}>
-              <Text style={styles.communityTitle}>You're doing great!</Text>
-              <Text style={styles.communitySubtitle}>Top 5% of community this week.</Text>
+              <Text style={styles.communityTitle}>Harika gidiyorsun!</Text>
+              <Text style={styles.communitySubtitle}>Bu hafta en iyi %5 içindesin.</Text>
             </View>
             <TouchableOpacity style={styles.communityViewButton}>
-              <Text style={styles.communityViewButtonText}>View</Text>
+              <Text style={styles.communityViewButtonText}>Görüntüle</Text>
             </TouchableOpacity>
           </View>
 

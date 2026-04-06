@@ -14,11 +14,8 @@ import { useStreak } from '../contexts/StreakContext';
 
 const { width } = Dimensions.get('window');
 
-// Primary color from design
 const PRIMARY = '#0df2a6';
-const PRIMARY_DIM = 'rgba(13, 242, 166, 0.2)';
 
-// Yıldız efekti için rastgele noktalar
 const generateStars = (count) => {
   const stars = [];
   for (let i = 0; i < count; i++) {
@@ -35,7 +32,112 @@ const generateStars = (count) => {
 
 const stars = generateStars(50);
 
-// Circular Progress Component with SVG
+// Non-linear progress curves
+// fast:    sqrt curve — hızlı başlar, ~60 günde platoya ulaşır
+// medium:  üstel doyum — ılımlı başlar, ~60 günde %95
+// delayed: sigmoid (merkez: 20. gün) — ilk 10 gün yavaş, sonra ivmelenir
+// slow:    sigmoid (merkez: 40. gün) — geç açılır, 90+ günde zirve
+// sexdrive: 30. güne kadar kilitli, sonra doğrusal büyür
+function calculateProgressCurve(days, curve) {
+  const d = Math.max(0, days);
+  switch (curve) {
+    case 'fast':
+      return Math.min(100, Math.round(100 * Math.sqrt(d / 60)));
+    case 'medium':
+      return Math.min(100, Math.round(100 * (1 - Math.exp(-d / 18))));
+    case 'delayed':
+      return Math.min(100, Math.max(0, Math.round(100 / (1 + Math.exp(-(d - 20) / 8)))));
+    case 'slow':
+      return Math.min(100, Math.max(0, Math.round(100 / (1 + Math.exp(-(d - 40) / 12)))));
+    case 'sexdrive':
+      if (d < 30) return 0;
+      return Math.min(100, Math.round((d - 30) * 100 / 60));
+    default:
+      return Math.min(100, Math.round(d * 100 / 90));
+  }
+}
+
+const BENEFIT_CONFIGS = [
+  {
+    emoji: '⚡',
+    title: 'Enerji',
+    description: 'Fiziksel enerji seviyen ilk günden itibaren yükseliyor.',
+    color: '#fbbf24',
+    curve: 'fast',
+  },
+  {
+    emoji: '🎯',
+    title: 'Motivasyon',
+    description: 'Hayata olan bağlılığın ve isteğin sürekli artıyor.',
+    color: '#a78bfa',
+    curve: 'fast',
+  },
+  {
+    emoji: '😴',
+    title: 'Uyku Kalitesi',
+    description: 'Uyku düzenin ilk haftadan itibaren oturuyor.',
+    color: '#38bdf8',
+    curve: 'fast',
+  },
+  {
+    emoji: '🧘',
+    title: 'Zihinsel Netlik',
+    description: 'Odaklanma ve berrak düşünme gücü kazanıyorsun.',
+    color: '#818cf8',
+    curve: 'medium',
+  },
+  {
+    emoji: '⏰',
+    title: 'Üretkenlik',
+    description: 'Zamanını çok daha anlamlı şeylere harcıyorsun.',
+    color: '#facc15',
+    curve: 'medium',
+  },
+  {
+    emoji: '💬',
+    title: 'Özgüven',
+    description: 'Sosyal ortamlarda kendine olan güven büyüyor.',
+    color: '#0df2a6',
+    curve: 'delayed',
+  },
+  {
+    emoji: '💥',
+    title: 'Öz-Saygı',
+    description: 'Kontrolünü kazandıkça içindeki ses değişiyor.',
+    color: '#f472b6',
+    curve: 'delayed',
+  },
+  {
+    emoji: '🤝',
+    title: 'Sosyal Beceriler',
+    description: 'Çevreniyle olan bağlantıların derinleşiyor.',
+    color: '#4ade80',
+    curve: 'delayed',
+  },
+  {
+    emoji: '🧠',
+    title: 'Sağlıklı Düşünceler',
+    description: 'Kaygı azalıyor; ilişkilere bakışın kökten değişiyor.',
+    color: '#c084fc',
+    curve: 'slow',
+  },
+  {
+    emoji: '💪',
+    title: 'Disiplin',
+    description: 'İrade ve öz-kontrol en geç, ama en kalıcı güç.',
+    color: '#fb7185',
+    curve: 'slow',
+  },
+  {
+    emoji: '🔥',
+    title: 'Cinsel Enerji',
+    description: '30. günden sonra dengeleniyor ve güçleniyor.',
+    color: '#f97316',
+    curve: 'sexdrive',
+  },
+];
+
+// Circular Progress Component
 function CircularProgress({ percentage, streak, size = 256 }) {
   const strokeWidth = 6;
   const radius = 42;
@@ -44,52 +146,36 @@ function CircularProgress({ percentage, streak, size = 256 }) {
 
   return (
     <View style={styles.circularProgressContainer}>
-      {/* Outer Glow */}
       <View style={styles.outerGlow} />
-      
-      {/* SVG Circle */}
       <Svg width={size} height={size} viewBox="0 0 100 100" style={styles.svgCircle}>
-        {/* Background Circle */}
         <Circle
-          cx="50"
-          cy="50"
-          r={radius}
-          stroke="#1f2937"
-          strokeWidth={strokeWidth}
-          fill="transparent"
-          strokeLinecap="round"
+          cx="50" cy="50" r={radius}
+          stroke="#1f2937" strokeWidth={strokeWidth}
+          fill="transparent" strokeLinecap="round"
         />
-        {/* Progress Circle */}
         <Circle
-          cx="50"
-          cy="50"
-          r={radius}
-          stroke={PRIMARY}
-          strokeWidth={strokeWidth}
-          fill="transparent"
-          strokeLinecap="round"
+          cx="50" cy="50" r={radius}
+          stroke={PRIMARY} strokeWidth={strokeWidth}
+          fill="transparent" strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
-          rotation="-90"
-          origin="50, 50"
+          rotation="-90" origin="50, 50"
         />
       </Svg>
-
-      {/* Inner Content */}
       <View style={styles.circularInnerContent}>
         <Text style={styles.percentageText}>
           {percentage}<Text style={styles.percentageSymbol}>%</Text>
         </Text>
         <View style={styles.streakBadge}>
           <Ionicons name="flame" size={16} color={PRIMARY} />
-          <Text style={styles.streakBadgeText}>{streak} D STREAK</Text>
+          <Text style={styles.streakBadgeText}>{streak} G STREAK</Text>
         </View>
       </View>
     </View>
   );
 }
 
-// Target Card Component
+// Hedef Card
 function TargetCard({ targetDays, targetDate }) {
   return (
     <View style={styles.targetCard}>
@@ -97,41 +183,36 @@ function TargetCard({ targetDays, targetDate }) {
         <Ionicons name="locate" size={18} color={PRIMARY} />
       </View>
       <View style={styles.targetTextContainer}>
-        <Text style={styles.targetLabel}>Target</Text>
+        <Text style={styles.targetLabel}>Hedef</Text>
         <Text style={styles.targetText}>
-          On track for {targetDays} Days <Text style={styles.targetDate}>({targetDate})</Text>
+          {targetDays} güne doğru gidiyorsun{' '}
+          <Text style={styles.targetDate}>({targetDate})</Text>
         </Text>
       </View>
     </View>
   );
 }
 
-// Progress Chart Component
+// İlerlemen Chart
 function ProgressChart() {
   const chartWidth = width - 80;
   const chartHeight = 128;
 
   return (
     <View style={styles.chartContainer}>
-      {/* Header */}
       <View style={styles.chartHeader}>
-        <Text style={styles.chartTitle}>Your Progress</Text>
+        <Text style={styles.chartTitle}>İlerlemen</Text>
         <View style={styles.chartBadge}>
           <Ionicons name="trending-up" size={16} color={PRIMARY} />
           <Text style={styles.chartBadgeText}>+12%</Text>
         </View>
       </View>
-
-      {/* Chart Area */}
       <View style={styles.chartArea}>
-        {/* Grid Lines */}
         <View style={styles.gridLines}>
           {[0, 1, 2, 3].map((i) => (
             <View key={i} style={styles.gridLine} />
           ))}
         </View>
-
-        {/* SVG Chart */}
         <Svg width={chartWidth} height={chartHeight} viewBox="0 0 300 100" preserveAspectRatio="none">
           <Defs>
             <SvgLinearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
@@ -139,124 +220,28 @@ function ProgressChart() {
               <Stop offset="100%" stopColor={PRIMARY} stopOpacity="0" />
             </SvgLinearGradient>
           </Defs>
-          {/* Area Fill */}
           <Path
             d="M0 80 Q 50 70, 75 50 T 150 40 T 225 30 T 300 10 V 100 H 0 Z"
             fill="url(#chartGradient)"
           />
-          {/* Line */}
           <Path
             d="M0 80 Q 50 70, 75 50 T 150 40 T 225 30 T 300 10"
-            stroke={PRIMARY}
-            strokeWidth="3"
-            strokeLinecap="round"
-            fill="none"
+            stroke={PRIMARY} strokeWidth="3" strokeLinecap="round" fill="none"
           />
-          {/* Current Point */}
           <Circle cx="300" cy="10" r="4" fill="#10231d" stroke={PRIMARY} strokeWidth="2" />
         </Svg>
-
-        {/* Week Labels */}
         <View style={styles.chartLabels}>
-          <Text style={styles.chartLabel}>Wk 1</Text>
-          <Text style={styles.chartLabel}>Wk 2</Text>
-          <Text style={styles.chartLabel}>Wk 3</Text>
-          <Text style={styles.chartLabel}>Wk 4</Text>
+          <Text style={styles.chartLabel}>Hf 1</Text>
+          <Text style={styles.chartLabel}>Hf 2</Text>
+          <Text style={styles.chartLabel}>Hf 3</Text>
+          <Text style={styles.chartLabel}>Hf 4</Text>
         </View>
       </View>
     </View>
   );
 }
 
-// Milestone-based progress calculator
-function calculateProgress(streakDays, milestones) {
-  for (let i = milestones.length - 1; i >= 0; i--) {
-    if (streakDays >= milestones[i].days) return milestones[i].progress;
-  }
-  return milestones[0].progress;
-}
-
-const BENEFIT_CONFIGS = [
-  {
-    emoji: '💬',
-    title: 'Improved Confidence',
-    description: 'Confidence grows in social and personal interactions.',
-    color: '#0df2a6',
-    milestones: [{ days: 0, progress: 5 }, { days: 7, progress: 20 }, { days: 14, progress: 50 }, { days: 30, progress: 100 }],
-  },
-  {
-    emoji: '💥',
-    title: 'Increased Self-Esteem',
-    description: 'Improving control boosts your self-image.',
-    color: '#f472b6',
-    milestones: [{ days: 0, progress: 5 }, { days: 10, progress: 30 }, { days: 21, progress: 70 }, { days: 30, progress: 100 }],
-  },
-  {
-    emoji: '🧘',
-    title: 'Mental Clarity',
-    description: 'Clear thinking and focus returns after quitting.',
-    color: '#818cf8',
-    milestones: [{ days: 0, progress: 5 }, { days: 5, progress: 15 }, { days: 14, progress: 60 }, { days: 21, progress: 100 }],
-  },
-  {
-    emoji: '🧠',
-    title: 'Healthier Thoughts',
-    description: 'Less anxiety; healthier views on relationships.',
-    color: '#c084fc',
-    milestones: [{ days: 0, progress: 5 }, { days: 14, progress: 25 }, { days: 30, progress: 60 }, { days: 45, progress: 100 }],
-  },
-  {
-    emoji: '⏰',
-    title: 'More Productivity',
-    description: 'More energy and focus for meaningful activities.',
-    color: '#facc15',
-    milestones: [{ days: 0, progress: 10 }, { days: 7, progress: 40 }, { days: 21, progress: 80 }, { days: 30, progress: 100 }],
-  },
-  {
-    emoji: '😴',
-    title: 'Better Sleep',
-    description: 'Improved sleep quality seen within a few days.',
-    color: '#38bdf8',
-    milestones: [{ days: 0, progress: 10 }, { days: 3, progress: 30 }, { days: 7, progress: 70 }, { days: 14, progress: 100 }],
-  },
-  {
-    emoji: '🔥',
-    title: 'Increased Sex Drive',
-    description: 'Healthier drive and performance after 30-45 days.',
-    color: '#f97316',
-    milestones: [{ days: 0, progress: 0 }, { days: 30, progress: 0 }, { days: 45, progress: 50 }, { days: 60, progress: 100 }],
-  },
-  {
-    emoji: '⚡',
-    title: 'Energy Levels',
-    description: 'Physical energy noticeably increases.',
-    color: '#fbbf24',
-    milestones: [{ days: 0, progress: 5 }, { days: 7, progress: 35 }, { days: 21, progress: 75 }, { days: 30, progress: 100 }],
-  },
-  {
-    emoji: '🤝',
-    title: 'Social Skills',
-    description: 'Social interaction quality improves.',
-    color: '#4ade80',
-    milestones: [{ days: 0, progress: 5 }, { days: 10, progress: 25 }, { days: 30, progress: 70 }, { days: 60, progress: 100 }],
-  },
-  {
-    emoji: '🎯',
-    title: 'Motivation',
-    description: 'General motivation levels rise steadily.',
-    color: '#a78bfa',
-    milestones: [{ days: 0, progress: 5 }, { days: 7, progress: 30 }, { days: 21, progress: 65 }, { days: 45, progress: 100 }],
-  },
-  {
-    emoji: '💪',
-    title: 'Discipline',
-    description: 'Self-control and willpower strengthen.',
-    color: '#fb7185',
-    milestones: [{ days: 0, progress: 5 }, { days: 7, progress: 30 }, { days: 30, progress: 70 }, { days: 60, progress: 100 }],
-  },
-];
-
-// Benefit Card Component
+// Benefit Card
 function BenefitCard({ emoji, title, description, progress, barColor }) {
   const getPercentColor = () => {
     if (progress >= 70) return PRIMARY;
@@ -298,25 +283,23 @@ function getTargetDate(streakData) {
     : streakData.startDate.toDate?.() || new Date(streakData.startDate);
   const target = new Date(start);
   target.setDate(target.getDate() + 90);
-  return target.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return target.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
 }
 
 export default function StatsScreen() {
   const { streakData } = useStreak();
   const currentStreak = streakData?.currentStreak || 0;
   const recoveryPercentage = Math.min(Math.round((currentStreak / 90) * 100), 100);
-
   const targetDate = getTargetDate(streakData);
 
   const benefits = BENEFIT_CONFIGS.map((cfg) => ({
     ...cfg,
-    progress: calculateProgress(currentStreak, cfg.milestones),
+    progress: calculateProgressCurve(currentStreak, cfg.curve),
   }));
 
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#0a0e27', '#1a1f3a']} style={styles.gradient}>
-        {/* Yıldız efekti */}
         {stars.map((star) => (
           <View
             key={star.id}
@@ -340,34 +323,30 @@ export default function StatsScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Analytics</Text>
+            <Text style={styles.headerTitle}>Analizler</Text>
             <TouchableOpacity style={styles.shareButton}>
               <Ionicons name="share-outline" size={20} color={PRIMARY} />
             </TouchableOpacity>
           </View>
 
-          {/* Hero Progress Circle Section */}
+          {/* Hero Progress Circle */}
           <View style={styles.heroSection}>
             <CircularProgress percentage={recoveryPercentage} streak={currentStreak} />
-            
-            {/* Target Card */}
             <TargetCard targetDays={90} targetDate={targetDate} />
-
-            {/* Motivational Text */}
             <Text style={styles.motivationText}>
-              "The journey of a thousand miles begins with a single step."
+              "Bin millik yolculuk tek bir adımla başlar."
             </Text>
           </View>
 
-          {/* Chart Section */}
+          {/* Chart */}
           <ProgressChart />
 
-          {/* Benefits Section */}
+          {/* Benefits */}
           <View style={styles.benefitsSection}>
             <View style={styles.benefitsHeader}>
-              <Text style={styles.benefitsTitle}>Benefits Unlocked</Text>
+              <Text style={styles.benefitsTitle}>Açılan Kazanımlar</Text>
               <TouchableOpacity>
-                <Text style={styles.viewAllText}>View All</Text>
+                <Text style={styles.viewAllText}>Tümünü Gör</Text>
               </TouchableOpacity>
             </View>
 
@@ -383,7 +362,6 @@ export default function StatsScreen() {
             ))}
           </View>
 
-          {/* Bottom spacing for tab bar */}
           <View style={{ height: 120 }} />
         </ScrollView>
       </LinearGradient>
@@ -392,20 +370,14 @@ export default function StatsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  gradient: { flex: 1 },
   star: {
     position: 'absolute',
     backgroundColor: '#fff',
     borderRadius: 10,
   },
-  scrollView: {
-    flex: 1,
-  },
+  scrollView: { flex: 1 },
   content: {
     paddingHorizontal: 24,
     paddingTop: 48,
@@ -499,7 +471,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.05)',
     width: '100%',
-    maxWidth: 280,
+    maxWidth: 300,
   },
   targetIconContainer: {
     width: 32,
@@ -509,15 +481,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  targetTextContainer: {
-    flex: 1,
-  },
+  targetTextContainer: { flex: 1 },
   targetLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 11,
+    fontWeight: '600',
     color: '#9ca3af',
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
   },
   targetText: {
     fontSize: 14,
@@ -525,9 +495,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 2,
   },
-  targetDate: {
-    color: '#0df2a6',
-  },
+  targetDate: { color: '#0df2a6' },
   motivationText: {
     marginTop: 24,
     fontSize: 14,
@@ -572,9 +540,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#0df2a6',
   },
-  chartArea: {
-    height: 148,
-  },
+  chartArea: { height: 148 },
   gridLines: {
     position: 'absolute',
     top: 0,
@@ -598,9 +564,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#6b7280',
   },
-  benefitsSection: {
-    marginTop: 32,
-  },
+  benefitsSection: { marginTop: 32 },
   benefitsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -624,9 +588,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.05)',
   },
@@ -638,12 +602,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  benefitEmoji: {
-    fontSize: 24,
-  },
-  benefitContent: {
-    flex: 1,
-  },
+  benefitEmoji: { fontSize: 24 },
+  benefitContent: { flex: 1 },
   benefitHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -651,7 +611,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   benefitTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#fff',
     flex: 1,
@@ -662,12 +622,13 @@ const styles = StyleSheet.create({
   },
   benefitDescription: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#6b7280',
     marginBottom: 8,
+    lineHeight: 17,
   },
   benefitProgressBar: {
-    height: 6,
-    backgroundColor: 'rgba(107, 114, 128, 0.5)',
+    height: 5,
+    backgroundColor: 'rgba(107, 114, 128, 0.3)',
     borderRadius: 3,
     overflow: 'hidden',
   },

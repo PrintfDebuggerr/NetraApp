@@ -18,17 +18,21 @@ import CreatePostModal from '../components/CreatePostModal';
 
 const PRIMARY = '#0df2a6';
 
-// Post Tag Component
+// Post tag styles — Turkish keys + legacy English fallbacks
+const TAG_STYLES = {
+  'Başarı':  { bg: 'rgba(34, 197, 94, 0.1)',   border: 'rgba(34, 197, 94, 0.2)',   text: '#4ade80' },
+  'İpucu':   { bg: 'rgba(59, 130, 246, 0.1)',  border: 'rgba(59, 130, 246, 0.2)',  text: '#60a5fa' },
+  'Günlük':  { bg: 'rgba(167, 139, 250, 0.1)', border: 'rgba(167, 139, 250, 0.2)', text: '#a78bfa' },
+  'Soru':    { bg: 'rgba(251, 191, 36, 0.1)',  border: 'rgba(251, 191, 36, 0.2)',  text: '#fbbf24' },
+  // Legacy support for old posts
+  'Victory': { bg: 'rgba(34, 197, 94, 0.1)',   border: 'rgba(34, 197, 94, 0.2)',   text: '#4ade80' },
+  'Vent':    { bg: 'rgba(239, 68, 68, 0.1)',   border: 'rgba(239, 68, 68, 0.2)',   text: '#f87171' },
+  'Tips':    { bg: 'rgba(59, 130, 246, 0.1)',  border: 'rgba(59, 130, 246, 0.2)',  text: '#60a5fa' },
+  'Relapse': { bg: 'rgba(100, 116, 139, 0.1)', border: 'rgba(100, 116, 139, 0.2)', text: '#94a3b8' },
+};
+
 function PostTag({ type }) {
-  const tagStyles = {
-    Victory: { bg: 'rgba(34, 197, 94, 0.1)', border: 'rgba(34, 197, 94, 0.2)', text: '#4ade80' },
-    Vent: { bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.2)', text: '#f87171' },
-    Tips: { bg: 'rgba(59, 130, 246, 0.1)', border: 'rgba(59, 130, 246, 0.2)', text: '#60a5fa' },
-    Relapse: { bg: 'rgba(100, 116, 139, 0.1)', border: 'rgba(100, 116, 139, 0.2)', text: '#94a3b8' },
-  };
-  
-  const style = tagStyles[type] || tagStyles.Tips;
-  
+  const style = TAG_STYLES[type] || TAG_STYLES['İpucu'];
   return (
     <View style={[styles.postTag, { backgroundColor: style.bg, borderColor: style.border }]}>
       <Text style={[styles.postTagText, { color: style.text }]}>{type}</Text>
@@ -36,48 +40,32 @@ function PostTag({ type }) {
   );
 }
 
-// Streak Badge Component
+// Streak level: early → gray, mid → blue, advanced → purple, elite → gold
+function getStreakLevel(days) {
+  if (days >= 90) return { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.25)' };
+  if (days >= 30) return { color: '#a78bfa', bg: 'rgba(167, 139, 250, 0.1)', border: 'rgba(167, 139, 250, 0.25)' };
+  if (days >= 7)  return { color: '#60a5fa', bg: 'rgba(59, 130, 246, 0.1)',  border: 'rgba(59, 130, 246, 0.25)' };
+  return           { color: '#94a3b8', bg: 'rgba(100, 116, 139, 0.1)', border: 'rgba(100, 116, 139, 0.2)' };
+}
+
 function StreakBadge({ days }) {
-  let color = '#94a3b8';
-  let bgColor = 'rgba(100, 116, 139, 0.1)';
-  let borderColor = 'rgba(100, 116, 139, 0.2)';
-  
-  if (days >= 90) {
-    color = '#c084fc';
-    bgColor = 'rgba(192, 132, 252, 0.1)';
-    borderColor = 'rgba(192, 132, 252, 0.2)';
-  } else if (days >= 30) {
-    color = '#0df2a6';
-    bgColor = 'rgba(13, 242, 166, 0.1)';
-    borderColor = 'rgba(13, 242, 166, 0.2)';
-  } else if (days >= 7) {
-    color = '#fb923c';
-    bgColor = 'rgba(251, 146, 60, 0.1)';
-    borderColor = 'rgba(251, 146, 60, 0.2)';
-  }
-  
-  const label = days === 0 ? 'Day 0' : days >= 90 ? '90+ Days' : `${days} Days`;
-  
+  const level = getStreakLevel(days);
   return (
-    <View style={[styles.streakBadge, { backgroundColor: bgColor, borderColor }]}>
-      <Text style={[styles.streakBadgeText, { color }]}>{label}</Text>
+    <View style={[styles.streakBadge, { backgroundColor: level.bg, borderColor: level.border }]}>
+      <Text style={[styles.streakBadgeText, { color: level.color }]}>{days}. Gün</Text>
     </View>
   );
 }
 
-// Post Card Component
 function CommunityPostCard({ post, onPress, onUpvote, isHighlighted, currentUserId }) {
-  const timeAgo = post.createdAt ? getTimeAgo(post.createdAt.toDate()) : 'Just now';
-  const postType = post.type || 'Tips';
+  const timeAgo = post.createdAt ? getTimeAgo(post.createdAt.toDate()) : 'Şimdi';
+  const postType = post.type || 'İpucu';
   const streakDays = post.streakDays || 0;
   const isUpvoted = currentUserId ? (post.likedBy || []).includes(currentUserId) : false;
 
   return (
     <TouchableOpacity
-      style={[
-        styles.postCard,
-        isHighlighted && styles.postCardHighlighted
-      ]}
+      style={[styles.postCard, isHighlighted && styles.postCardHighlighted]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -88,7 +76,7 @@ function CommunityPostCard({ post, onPress, onUpvote, isHighlighted, currentUser
         </View>
         <View style={styles.postUserInfo}>
           <View style={styles.postUserRow}>
-            <Text style={styles.postUserName}>{post.userName || 'Anonymous'}</Text>
+            <Text style={styles.postUserName}>{post.userName || 'Anonim'}</Text>
             <StreakBadge days={streakDays} />
           </View>
           <Text style={styles.postTime}>{timeAgo}</Text>
@@ -99,7 +87,7 @@ function CommunityPostCard({ post, onPress, onUpvote, isHighlighted, currentUser
       {/* Post Content */}
       <Text style={styles.postContent}>{post.content}</Text>
 
-      {/* Interaction Footer */}
+      {/* Footer */}
       <View style={styles.postFooter}>
         <View style={styles.quittrBrand}>
           <Ionicons name="shield-checkmark" size={14} color="rgba(255,255,255,0.3)" />
@@ -128,18 +116,17 @@ function CommunityPostCard({ post, onPress, onUpvote, isHighlighted, currentUser
   );
 }
 
-// Helper function for time ago
 function getTimeAgo(date) {
   const now = new Date();
   const diffMs = now - date;
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-  
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return `${diffDays}d ago`;
+
+  if (diffMins < 1) return 'Şimdi';
+  if (diffMins < 60) return `${diffMins} dk önce`;
+  if (diffHours < 24) return `${diffHours} saat önce`;
+  return `${diffDays} gün önce`;
 }
 
 export default function FeedScreen({ navigation }) {
@@ -156,15 +143,11 @@ export default function FeedScreen({ navigation }) {
     const q = query(postsRef, orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const postsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const postsData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
       setPosts(postsData);
       setLoading(false);
       setRefreshing(false);
-    }, (error) => {
-      console.error('Error fetching posts:', error);
+    }, () => {
       setLoading(false);
       setRefreshing(false);
     });
@@ -174,15 +157,14 @@ export default function FeedScreen({ navigation }) {
 
   const handleCreatePost = async (content, type) => {
     if (!user) return;
-
     await addDoc(collection(db, 'posts'), {
       userId: user.uid,
-      userName: user.email?.split('@')[0] || 'Anonymous',
+      userName: user.email?.split('@')[0] || 'Anonim',
       content,
       createdAt: serverTimestamp(),
       likes: 0,
       commentCount: 0,
-      type: type || 'Tips',
+      type: type || 'İpucu',
       streakDays: streakData?.currentStreak || 0,
     });
   };
@@ -201,10 +183,6 @@ export default function FeedScreen({ navigation }) {
     navigation.navigate('PostDetail', { post });
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-  };
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -215,7 +193,6 @@ export default function FeedScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Starry Background */}
       <View style={styles.starsOverlay} />
       <LinearGradient
         colors={['transparent', 'rgba(15, 23, 42, 0.9)']}
@@ -225,16 +202,13 @@ export default function FeedScreen({ navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>Community</Text>
+          <Text style={styles.headerTitle}>Topluluk</Text>
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerIconBtn}>
-              <Ionicons name="notifications-outline" size={20} color="rgba(255,255,255,0.8)" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerIconBtn}>
-              <Ionicons name="chatbubble-outline" size={20} color="rgba(255,255,255,0.8)" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerIconBtn}>
-              <Ionicons name="book-outline" size={20} color="rgba(255,255,255,0.8)" />
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => navigation.navigate('Leaderboard')}
+            >
+              <Ionicons name="trophy-outline" size={20} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
           </View>
         </View>
@@ -242,21 +216,21 @@ export default function FeedScreen({ navigation }) {
         {/* Tabs */}
         <View style={styles.tabsContainer}>
           <View style={styles.tabsPill}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.tabButton, activeTab === 'Forum' && styles.tabButtonActive]}
               onPress={() => setActiveTab('Forum')}
             >
               <Text style={[styles.tabText, activeTab === 'Forum' && styles.tabTextActive]}>Forum</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.tabButton, activeTab === 'Teams' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('Teams')}
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'Gruplar' && styles.tabButtonActive]}
+              onPress={() => setActiveTab('Gruplar')}
             >
-              <Text style={[styles.tabText, activeTab === 'Teams' && styles.tabTextActive]}>Teams</Text>
+              <Text style={[styles.tabText, activeTab === 'Gruplar' && styles.tabTextActive]}>Gruplar</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.filterButton}>
-            <Text style={styles.filterText}>New</Text>
+            <Text style={styles.filterText}>Yeni</Text>
             <Ionicons name="chevron-down" size={16} color="#94a3b8" />
           </TouchableOpacity>
         </View>
@@ -280,20 +254,20 @@ export default function FeedScreen({ navigation }) {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
+            onRefresh={() => setRefreshing(true)}
             tintColor={PRIMARY}
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={48} color="#475569" />
-            <Text style={styles.emptyText}>No posts yet</Text>
-            <Text style={styles.emptySubtext}>Be the first to share!</Text>
+            <Ionicons name="chatbubbles-outline" size={48} color="#334155" />
+            <Text style={styles.emptyText}>Yalnız değilsin.</Text>
+            <Text style={styles.emptySubtext}>Herkes bu yoldan geçiyor.</Text>
           </View>
         }
       />
 
-      {/* Floating Action Button */}
+      {/* FAB */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => setShowCreateModal(true)}
@@ -318,18 +292,12 @@ const styles = StyleSheet.create({
   },
   starsOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     opacity: 0.3,
   },
   gradientOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
   },
   loadingContainer: {
     flex: 1,
@@ -426,7 +394,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E293B',
     borderRadius: 16,
     padding: 20,
-    marginBottom: 20,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
   },
@@ -469,7 +437,7 @@ const styles = StyleSheet.create({
   },
   postTime: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#64748b',
     marginTop: 2,
   },
   streakBadge: {
@@ -483,7 +451,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   postTag: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
@@ -510,7 +478,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    opacity: 0.5,
+    opacity: 0.4,
   },
   quittrText: {
     fontSize: 10,
@@ -574,18 +542,19 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingTop: 60,
-    gap: 8,
+    paddingTop: 80,
+    gap: 6,
   },
   emptyText: {
     fontSize: 18,
-    color: '#fff',
-    fontWeight: '600',
-    marginTop: 8,
+    color: '#e2e8f0',
+    fontWeight: '700',
+    marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
     color: '#64748b',
+    lineHeight: 20,
   },
   fab: {
     position: 'absolute',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,410 +6,423 @@ import {
   StyleSheet,
   ScrollView,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { badges } from '../utils/badgeData';
+import { Ionicons } from '@expo/vector-icons';
+import { BADGES, getCurrentBadge, getNextBadge } from '../utils/badgeData';
+import { BADGE_THEMES } from '../utils/badgeThemes';
+import BadgeCircle from '../components/BadgeCircle';
+import { useStreak } from '../contexts/StreakContext';
 
 const { width } = Dimensions.get('window');
-const PRIMARY = '#0df2a6';
+const PRIMARY   = '#0df2a6';
+const GRID_PAD  = 20;
+const GRID_GAP  = 14;
+const BADGE_SZ  = Math.floor((width - GRID_PAD * 2 - GRID_GAP * 2) / 3);
 
-// Yıldız efekti için rastgele noktalar
-const generateStars = (count) => {
-  const stars = [];
-  for (let i = 0; i < count; i++) {
-    stars.push({
-      id: i,
-      left: Math.random() * 100,
-      top: Math.random() * 100,
-      size: Math.random() * 2 + 1,
-      opacity: Math.random() * 0.3 + 0.1,
-    });
-  }
-  return stars;
-};
+// ─── Static stars (generated once) ───────────────────────────────────────────
+const STARS = Array.from({ length: 50 }, (_, i) => ({
+  id: i,
+  left:    Math.random() * 100,
+  top:     Math.random() * 100,
+  size:    Math.random() * 1.8 + 0.8,
+  opacity: Math.random() * 0.22 + 0.05,
+}));
 
-const stars = generateStars(40);
+// ─── Badge grid item ──────────────────────────────────────────────────────────
+function BadgeItem({ badge, currentStreak, isCurrent, index }) {
+  const isEarned = badge.requiredDays <= currentStreak;
+  const daysLeft = Math.max(0, badge.requiredDays - currentStreak);
 
-// Badge Component
-function BadgeItem({ badge }) {
-  if (!badge.unlocked) {
-    return (
-      <View style={styles.badgeItem}>
-        <View style={styles.lockedBadgeOuter}>
-          <View style={styles.lockedBadgeInner}>
-            <Ionicons name="lock-closed" size={28} color="#6b7280" />
-          </View>
-        </View>
-        <View style={styles.badgeTextContainer}>
-          <Text style={styles.lockedBadgeTitle}>{badge.title}</Text>
-          <Text style={styles.lockedBadgeTier}>LOCKED</Text>
-        </View>
-      </View>
-    );
-  }
+  // Entry: staggered spring scale + fade
+  const entryScale   = useRef(new Animated.Value(0.55)).current;
+  const entryOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(entryScale, {
+        toValue: 1,
+        tension: 55,
+        friction: 7,
+        delay: index * 55,
+        useNativeDriver: true,
+      }),
+      Animated.timing(entryOpacity, {
+        toValue: isEarned ? 1 : 0.36,
+        duration: 280,
+        delay: index * 55,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   return (
-    <TouchableOpacity style={styles.badgeItem} activeOpacity={0.8}>
-      <LinearGradient
-        colors={badge.colors}
-        style={[
-          styles.badgeOuter,
-          badge.glow && styles.badgeGlow,
-        ]}
-      >
-        <View style={[styles.badgeInner, { backgroundColor: badge.bgColor }]}>
-          <View style={styles.badgeShine} />
-          {badge.iconType === 'material' ? (
-            <MaterialCommunityIcons 
-              name={badge.icon} 
-              size={36} 
-              color={badge.iconColor} 
-            />
-          ) : (
-            <Ionicons 
-              name={badge.icon} 
-              size={36} 
-              color={badge.iconColor} 
-            />
-          )}
-        </View>
-      </LinearGradient>
-      <View style={styles.badgeTextContainer}>
-        <Text style={styles.badgeTitle}>{badge.title}</Text>
-        {badge.tierColor === 'rainbow' ? (
-          <LinearGradient
-            colors={['#f472b6', '#06b6d4']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.rainbowTierBg}
-          >
-            <Text style={styles.rainbowTierText}>{badge.tier.toUpperCase()}</Text>
-          </LinearGradient>
+    <Animated.View
+      style={[
+        styles.badgeItem,
+        { opacity: entryOpacity, transform: [{ scale: entryScale }] },
+      ]}
+    >
+      <BadgeCircle
+        badge={badge}
+        size={BADGE_SZ}
+        isEarned={isEarned}
+        isCurrent={isCurrent}
+      />
+
+      <View style={styles.labelWrap}>
+        <Text
+          style={[styles.badgeName, !isEarned && styles.badgeNameLocked]}
+          numberOfLines={1}
+        >
+          {badge.name}
+        </Text>
+
+        {isCurrent && isEarned ? (
+          <View style={styles.activePill}>
+            <View style={styles.activeDot} />
+            <Text style={styles.activePillText}>Aktif</Text>
+          </View>
+        ) : isEarned ? (
+          <Text style={styles.earnedLabel}>
+            {badge.requiredDays === 0 ? '—' : `${badge.requiredDays} gün`}
+          </Text>
         ) : (
-          <Text style={[styles.badgeTier, { color: badge.tierColor }]}>
-            {badge.tier.toUpperCase()}
+          <Text style={styles.lockedLabel}>
+            {daysLeft === 0 ? 'Hemen!' : `${daysLeft}g kaldı`}
           </Text>
         )}
       </View>
-    </TouchableOpacity>
+    </Animated.View>
   );
 }
 
+// ─── Screen ───────────────────────────────────────────────────────────────────
 export default function AchievementsScreen({ navigation }) {
-  const unlockedCount = badges.filter(b => b.unlocked).length;
-  const totalCount = badges.length;
-  const progressPercent = (unlockedCount / totalCount) * 100;
+  const { streakData }   = useStreak();
+  const currentStreak    = streakData?.currentStreak ?? 0;
+  const currentBadge     = getCurrentBadge(currentStreak);
+  const nextBadge        = getNextBadge(currentStreak);
+  const earnedCount      = BADGES.filter((b) => b.requiredDays <= currentStreak).length;
+  const totalCount       = BADGES.length;
+  const overallPct       = (earnedCount / totalCount) * 100;
+
+  // Segment: progress from current badge to next
+  const prevDays    = currentBadge?.requiredDays ?? 0;
+  const nextDays    = nextBadge?.requiredDays ?? prevDays;
+  const segmentPct  = nextBadge && nextDays > prevDays
+    ? Math.min(100, ((currentStreak - prevDays) / (nextDays - prevDays)) * 100)
+    : 100;
+
+  // Colors for segment bar — pulled from theme, not from badge object
+  const nextTheme   = nextBadge ? BADGE_THEMES[nextBadge.id] : null;
+  const curTheme    = currentBadge ? BADGE_THEMES[currentBadge.id] : null;
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#0a1517', '#0f2023', '#071618']}
-        style={styles.gradient}
-      >
-        {/* Yıldız efekti */}
-        {stars.map((star) => (
+      <LinearGradient colors={['#07090f', '#0a0d18', '#060810']} style={styles.gradient}>
+
+        {/* Stars */}
+        {STARS.map((s) => (
           <View
-            key={star.id}
+            key={s.id}
             style={[
               styles.star,
-              {
-                left: `${star.left}%`,
-                top: `${star.top}%`,
-                width: star.size,
-                height: star.size,
-                opacity: star.opacity,
-              },
+              { left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, opacity: s.opacity },
             ]}
           />
         ))}
 
-        {/* Header */}
+        {/* ── Header ── */}
         <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
+          <TouchableOpacity
+            style={styles.backBtn}
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
+
           <View style={styles.headerCenter}>
-            <Text style={styles.headerBrand}>QUITTR</Text>
-            <Text style={styles.headerTitle}>Achievements</Text>
+            <Text style={styles.headerBrand}>NETRA</Text>
+            <Text style={styles.headerTitle}>Başarımlar</Text>
           </View>
-          <View style={styles.headerLogo}>
-            <LinearGradient
-              colors={[PRIMARY, '#a855f7']}
-              style={styles.logoGradient}
-            >
-              <View style={styles.logoInner}>
-                <Text style={styles.logoText}>Q</Text>
-              </View>
-            </LinearGradient>
+
+          <View style={styles.countChip}>
+            <Text style={styles.countChipNum}>{earnedCount}</Text>
+            <Text style={styles.countChipSep}>/</Text>
+            <Text style={styles.countChipTotal}>{totalCount}</Text>
           </View>
         </View>
 
-        <ScrollView 
-          style={styles.scrollView}
+        <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Progress Section */}
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.levelText}>Level 4</Text>
-              <Text style={styles.collectedText}>{unlockedCount}/{totalCount} collected</Text>
+          {/* ── Progress card ── */}
+          <View style={styles.card}>
+            {/* Top row: current badge name + fraction */}
+            <View style={styles.cardTop}>
+              <View>
+                <Text style={styles.cardLabel}>Mevcut Rozet</Text>
+                <Text style={[styles.cardBadgeName, { color: curTheme?.iconColor ?? PRIMARY }]}>
+                  {currentBadge?.name ?? 'Başlangıç'}
+                </Text>
+              </View>
+              <View style={styles.fraction}>
+                <Text style={styles.fractionNum}>{earnedCount}</Text>
+                <Text style={styles.fractionSlash}>/</Text>
+                <Text style={styles.fractionDen}>{totalCount}</Text>
+              </View>
             </View>
-            <View style={styles.progressBarOuter}>
-              <LinearGradient
-                colors={['#0891b2', PRIMARY, '#a855f7']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[styles.progressBarFill, { width: `${progressPercent}%` }]}
-              />
+
+            {/* Overall collection progress */}
+            <View style={styles.barTrack}>
+              <View style={[styles.barFillWrap, { width: `${overallPct}%` }]}>
+                <LinearGradient
+                  colors={['#0891b2', PRIMARY, '#a855f7']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.barFill}
+                />
+              </View>
             </View>
-            <Text style={styles.progressHint}>Keep going to unlock next tier</Text>
+
+            {/* Next badge row */}
+            {nextBadge ? (
+              <>
+                <View style={styles.nextRow}>
+                  <View>
+                    <Text style={styles.nextLabel}>Sonraki Rozet</Text>
+                    <Text style={[styles.nextName, { color: nextTheme?.iconColor ?? PRIMARY }]}>
+                      {nextBadge.name}
+                    </Text>
+                  </View>
+                  <View style={styles.daysLeftWrap}>
+                    <Text style={styles.daysLeftNum}>
+                      {Math.max(0, nextBadge.requiredDays - currentStreak)}
+                    </Text>
+                    <Text style={styles.daysLeftUnit}>gün</Text>
+                  </View>
+                </View>
+
+                {/* Segment progress bar */}
+                <View style={[styles.barTrack, { height: 4, marginTop: 8 }]}>
+                  <View style={[styles.barFillWrap, { width: `${segmentPct}%` }]}>
+                    <LinearGradient
+                      colors={[
+                        nextTheme?.ringColor  ?? PRIMARY,
+                        nextTheme?.iconColor  ?? '#a855f7',
+                      ]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.barFill}
+                    />
+                  </View>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.allDoneText}>
+                Tüm rozetler kazanıldı — Efsane!
+              </Text>
+            )}
           </View>
 
-          {/* Badges Grid */}
-          <View style={styles.badgesGrid}>
-            {badges.map((badge) => (
-              <BadgeItem key={badge.id} badge={badge} />
+          {/* ── Badge grid ── */}
+          <View style={styles.grid}>
+            {BADGES.map((badge, i) => (
+              <BadgeItem
+                key={badge.id}
+                badge={badge}
+                currentStreak={currentStreak}
+                isCurrent={badge.id === currentBadge?.id}
+                index={i}
+              />
             ))}
           </View>
 
-          {/* Bottom spacing */}
-          <View style={{ height: 120 }} />
+          <View style={{ height: 100 }} />
         </ScrollView>
       </LinearGradient>
     </View>
   );
 }
 
-const badgeSize = (width - 48 - 32) / 3;
-
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  star: {
-    position: 'absolute',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-  },
+  container: { flex: 1 },
+  gradient:  { flex: 1 },
+  star: { position: 'absolute', backgroundColor: '#fff', borderRadius: 10 },
+
+  // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 48,
-    paddingBottom: 16,
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+    paddingTop:        52,
+    paddingBottom:     14,
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(15, 32, 35, 0.85)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: 'rgba(255,255,255,0.04)',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+  backBtn: {
+    width:           38,
+    height:          38,
+    borderRadius:    19,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    justifyContent:  'center',
+    alignItems:      'center',
+    borderWidth:     1,
+    borderColor:     'rgba(255,255,255,0.08)',
   },
-  headerCenter: {
-    alignItems: 'center',
-  },
+  headerCenter: { alignItems: 'center' },
   headerBrand: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: PRIMARY,
-    letterSpacing: 3,
-    marginBottom: 2,
+    fontSize:    9,
+    fontWeight:  '800',
+    color:       PRIMARY,
+    letterSpacing: 3.5,
+    marginBottom:  1,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize:   18,
     fontWeight: '700',
-    color: '#fff',
+    color:      '#f3f4f6',
   },
-  headerLogo: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+  countChip: {
+    flexDirection:   'row',
+    alignItems:      'baseline',
+    backgroundColor: 'rgba(13,242,166,0.08)',
+    borderRadius:    10,
+    paddingHorizontal: 10,
+    paddingVertical:   5,
+    borderWidth:     1,
+    borderColor:     'rgba(13,242,166,0.18)',
+    gap: 2,
   },
-  logoGradient: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    padding: 1,
-    shadowColor: PRIMARY,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
+  countChipNum:   { fontSize: 15, fontWeight: '800', color: PRIMARY },
+  countChipSep:   { fontSize: 12, fontWeight: '400', color: 'rgba(13,242,166,0.4)' },
+  countChipTotal: { fontSize: 12, fontWeight: '500', color: 'rgba(13,242,166,0.5)' },
+
+  // Scroll
+  scroll:        { flex: 1 },
+  scrollContent: { paddingHorizontal: GRID_PAD, paddingTop: 20 },
+
+  // Progress card
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius:    22,
+    padding:         18,
+    borderWidth:     1,
+    borderColor:     'rgba(255,255,255,0.07)',
+    marginBottom:    28,
   },
-  logoInner: {
-    flex: 1,
-    borderRadius: 16,
-    backgroundColor: '#0f2023',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-  },
-  progressSection: {
-    paddingVertical: 24,
-    gap: 12,
-  },
-  progressHeader: {
-    flexDirection: 'row',
+  cardTop: {
+    flexDirection:  'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingHorizontal: 4,
+    alignItems:     'flex-start',
+    marginBottom:   14,
   },
-  levelText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: PRIMARY,
-    textShadowColor: 'rgba(13, 242, 166, 0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 5,
-  },
-  collectedText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.8)',
-  },
-  progressBarOuter: {
-    height: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 999,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 999,
-    shadowColor: PRIMARY,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 15,
-    elevation: 6,
-  },
-  progressHint: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: 'rgba(103, 232, 249, 0.5)',
-    textAlign: 'center',
-    letterSpacing: 2,
+  cardLabel: {
+    fontSize:      10,
+    fontWeight:    '600',
+    color:         '#4b5563',
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
+    marginBottom:  3,
   },
-  badgesGrid: {
+  cardBadgeName: {
+    fontSize:   22,
+    fontWeight: '800',
+  },
+  fraction: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems:    'baseline',
+    gap: 2,
+  },
+  fractionNum:   { fontSize: 30, fontWeight: '800', color: '#f3f4f6' },
+  fractionSlash: { fontSize: 18, fontWeight: '400', color: '#2d3748' },
+  fractionDen:   { fontSize: 15, fontWeight: '500', color: '#374151' },
+
+  // Bars
+  barTrack: {
+    height:          7,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius:    999,
+    overflow:        'hidden',
+  },
+  barFillWrap: { height: '100%' },
+  barFill:     { flex: 1 },
+
+  // Next badge
+  nextRow: {
+    flexDirection:  'row',
     justifyContent: 'space-between',
-    gap: 16,
-    paddingTop: 8,
+    alignItems:     'center',
+    marginTop:      14,
   },
+  nextLabel: {
+    fontSize:      9,
+    fontWeight:    '700',
+    color:         '#374151',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom:  3,
+  },
+  nextName:      { fontSize: 14, fontWeight: '700' },
+  daysLeftWrap:  { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  daysLeftNum:   { fontSize: 26, fontWeight: '800', color: '#f3f4f6' },
+  daysLeftUnit:  { fontSize: 12, fontWeight: '500', color: '#4b5563' },
+  allDoneText: {
+    fontSize:   12,
+    fontWeight: '600',
+    color:      PRIMARY,
+    textAlign:  'center',
+    marginTop:  12,
+  },
+
+  // Grid
+  grid: {
+    flexDirection: 'row',
+    flexWrap:      'wrap',
+    gap:           GRID_GAP,
+  },
+
+  // Badge item
   badgeItem: {
-    width: badgeSize,
+    width:      BADGE_SZ,
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 24,
+    gap:        10,
+    marginBottom: 6,
   },
-  badgeOuter: {
-    width: badgeSize,
-    height: badgeSize,
-    borderRadius: badgeSize / 2,
-    padding: 2,
-  },
-  badgeGlow: {
-    shadowColor: PRIMARY,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  badgeInner: {
-    flex: 1,
-    borderRadius: badgeSize / 2,
-    justifyContent: 'center',
+  labelWrap: {
     alignItems: 'center',
-    overflow: 'hidden',
+    gap:        4,
+    width:      BADGE_SZ,
   },
-  badgeShine: {
-    position: 'absolute',
-    top: -badgeSize * 0.3,
-    left: -badgeSize * 0.3,
-    width: badgeSize * 0.8,
-    height: badgeSize * 0.8,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: badgeSize / 2,
-    transform: [{ rotate: '45deg' }],
-  },
-  badgeTextContainer: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  badgeTitle: {
-    fontSize: 14,
+  badgeName: {
+    fontSize:   12,
     fontWeight: '700',
-    color: '#fff',
+    color:      '#e5e7eb',
+    textAlign:  'center',
   },
-  badgeTier: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
+  badgeNameLocked: { color: '#1e2a3a' },
+  earnedLabel:     { fontSize: 10, fontWeight: '500', color: '#374151' },
+  lockedLabel:     { fontSize: 10, fontWeight: '500', color: '#1a2030' },
+
+  // Active pill
+  activePill: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    gap:             4,
+    backgroundColor: 'rgba(13,242,166,0.1)',
+    borderRadius:    6,
+    paddingHorizontal: 7,
+    paddingVertical:   2,
+    borderWidth:     1,
+    borderColor:     'rgba(13,242,166,0.22)',
   },
-  rainbowTierBg: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  rainbowTierText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: 1,
-  },
-  lockedBadgeOuter: {
-    width: badgeSize,
-    height: badgeSize,
-    borderRadius: badgeSize / 2,
-    backgroundColor: '#374151',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    padding: 2,
-    opacity: 0.5,
-  },
-  lockedBadgeInner: {
-    flex: 1,
-    borderRadius: badgeSize / 2,
-    backgroundColor: '#151515',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  lockedBadgeTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#9ca3af',
-  },
-  lockedBadgeTier: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#4b5563',
-    letterSpacing: 1,
-  },
+  activeDot:     { width: 5, height: 5, borderRadius: 3, backgroundColor: PRIMARY },
+  activePillText: { color: PRIMARY, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
 });

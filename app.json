@@ -15,6 +15,12 @@
           "defaultChannel": "streak-reminders",
           "sounds": []
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Panik butonu özelliği için kameraya erişim gerekiyor."
+        }
       ]
     ],
     "splash": {
@@ -23,7 +29,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Panik butonu özelliği için kameraya erişim gerekiyor."
+      }
     },
     "android": {
       "adaptiveIcon": {

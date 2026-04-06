@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,62 +13,50 @@ import { db } from '../../config/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 
-// Star background
-const generateStars = (count) => {
-  const arr = [];
-  for (let i = 0; i < count; i++) {
-    arr.push({
-      id: i,
-      left: Math.random() * 100,
-      top: Math.random() * 100,
-      size: Math.random() * 2 + 1,
-      opacity: Math.random() * 0.3 + 0.1,
-    });
-  }
-  return arr;
-};
-const stars = generateStars(40);
+const PRIMARY = '#0df2a6';
+
+const STARS = Array.from({ length: 30 }, (_, i) => ({
+  id: i,
+  left: Math.random() * 100,
+  top: Math.random() * 100,
+  size: Math.random() * 1.5 + 0.8,
+  opacity: Math.random() * 0.25 + 0.08,
+}));
 
 const INFO_ITEMS = [
   {
     icon: 'checkmark-circle',
-    lib: 'Ionicons',
     title: 'Ulaşılabilir Hedef',
-    desc: 'Söz verdiğinde yalnızca bugün için relapse olmamayı taahhüt ediyorsun.',
+    desc: 'Sadece bugün için temiz kalmaya söz ver.',
   },
   {
-    icon: 'sparkles',
-    lib: 'Ionicons',
-    title: 'Rahatla',
-    desc: 'Günü normal yaşa. Söz verdikten sonra fikrinden dönme.',
+    icon: 'remove-circle',
+    title: 'Fikrini Değiştirme',
+    desc: 'Günü normal yaşa ve verdiğin sözü bozma.',
   },
   {
-    icon: 'crown',
-    lib: 'Material',
-    title: 'Başarı Kaçınılmaz',
-    desc: 'İlk birkaç gün zor olacak ama zamanla çok daha kolaylaşacak. Güçlü dur.',
+    icon: 'trending-up',
+    title: 'Zor Başlar, Kolaylaşır',
+    desc: 'İlk günler zor olabilir, sonra hafifler.',
   },
 ];
 
 function formatCountdown(ms) {
   if (ms <= 0) return { hours: '00', minutes: '00', seconds: '00' };
   const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
   return {
-    hours: String(h).padStart(2, '0'),
-    minutes: String(m).padStart(2, '0'),
-    seconds: String(s).padStart(2, '0'),
+    hours:   String(Math.floor(totalSec / 3600)).padStart(2, '0'),
+    minutes: String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0'),
+    seconds: String(totalSec % 60).padStart(2, '0'),
   };
 }
 
 export default function PledgeScreen({ navigation }) {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [pledging, setPledging] = useState(false);
-  const [activePledge, setActivePledge] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [loading, setLoading]             = useState(true);
+  const [pledging, setPledging]           = useState(false);
+  const [activePledge, setActivePledge]   = useState(null);
+  const [timeLeft, setTimeLeft]           = useState(0);
   const [pledgeComplete, setPledgeComplete] = useState(false);
 
   const loadPledge = useCallback(async () => {
@@ -113,7 +100,7 @@ export default function PledgeScreen({ navigation }) {
   }, [activePledge]);
 
   const handlePledgeNow = async () => {
-    if (!user) return;
+    if (!user?.uid) return;
     setPledging(true);
     try {
       await setDoc(
@@ -131,10 +118,11 @@ export default function PledgeScreen({ navigation }) {
 
   const countdown = formatCountdown(timeLeft);
 
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <LinearGradient colors={['#070b18', '#0B1121', '#0f1a2e']} style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
+      <LinearGradient colors={['#070b18', '#0B1121', '#0f1a2e']} style={styles.fill}>
+        <SafeAreaView style={styles.fill}>
           <View style={styles.centerFill}>
             <Text style={styles.loadingText}>Yükleniyor...</Text>
           </View>
@@ -143,375 +131,386 @@ export default function PledgeScreen({ navigation }) {
     );
   }
 
-  return (
-    <LinearGradient colors={['#070b18', '#0B1121', '#0f1a2e']} style={styles.container}>
-      {/* Stars */}
-      {stars.map((star) => (
-        <View
-          key={star.id}
-          style={[
-            styles.star,
-            { left: `${star.left}%`, top: `${star.top}%`, width: star.size, height: star.size, opacity: star.opacity },
-          ]}
-        />
-      ))}
-
-      <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="close" size={20} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Taahhüt</Text>
-          <TouchableOpacity style={styles.headerBtn}>
-            <Ionicons name="help-circle-outline" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ── Taahhüt Tamamlandı ── */}
-          {pledgeComplete && (
-            <View style={styles.centerContent}>
+  // ── Completed ─────────────────────────────────────────────────────────────
+  if (pledgeComplete) {
+    return (
+      <LinearGradient colors={['#070b18', '#0B1121', '#0f1a2e']} style={styles.fill}>
+        <SafeAreaView style={styles.fill}>
+          <View style={styles.screen}>
+            <View style={styles.header}>
+              <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
+                <Ionicons name="close" size={20} color="#fff" />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Taahhüt</Text>
+              <View style={styles.headerBtn} />
+            </View>
+            <View style={styles.completeCenter}>
               <Text style={styles.completeEmoji}>🎉</Text>
               <Text style={styles.completeTitle}>Başardın!</Text>
               <Text style={styles.completeSubtitle}>
-                24 saat temizdin!{'\n'}Bugün gücünü kanıtladın. Harikasın.
+                24 saat temizdin.{'\n'}Bugün gücünü kanıtladın.
               </Text>
+            </View>
+            <View style={styles.bottomSection}>
               <TouchableOpacity
-                style={styles.pledgeNowBtn}
-                onPress={() => {
-                  setPledgeComplete(false);
-                  setActivePledge(null);
-                }}
+                style={styles.primaryBtn}
+                onPress={() => { setPledgeComplete(false); setActivePledge(null); }}
               >
-                <Text style={styles.pledgeNowText}>Tekrar Söz Ver</Text>
+                <Text style={styles.primaryBtnText}>Tekrar Söz Ver</Text>
               </TouchableOpacity>
             </View>
-          )}
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
 
-          {/* ── Aktif Taahhüt Geri Sayımı ── */}
-          {!pledgeComplete && activePledge && (
-            <View style={styles.centerContent}>
-              <View style={styles.handContainer}>
-                <MaterialCommunityIcons name="hand-back-left" size={100} color="#d1d5db" />
-              </View>
-              <Text style={styles.pledgeActiveTitle}>Taahhüt Aktif</Text>
-              <Text style={styles.pledgeActiveSubtitle}>
-                Kararlısın. Güçlü kal!
-              </Text>
-
-              <View style={styles.countdownContainer}>
-                <View style={styles.countdownUnit}>
-                  <Text style={styles.countdownValue}>{countdown.hours}</Text>
-                  <Text style={styles.countdownLabel}>saat</Text>
-                </View>
-                <Text style={styles.countdownSep}>:</Text>
-                <View style={styles.countdownUnit}>
-                  <Text style={styles.countdownValue}>{countdown.minutes}</Text>
-                  <Text style={styles.countdownLabel}>dk</Text>
-                </View>
-                <Text style={styles.countdownSep}>:</Text>
-                <View style={styles.countdownUnit}>
-                  <Text style={styles.countdownValue}>{countdown.seconds}</Text>
-                  <Text style={styles.countdownLabel}>sn</Text>
-                </View>
-              </View>
-
-              <Text style={styles.countdownCaption}>taahhüdünde kalan süre</Text>
-
-              <View style={styles.infoCard}>
-                {INFO_ITEMS.map((item) => (
-                  <View key={item.title} style={styles.infoItem}>
-                    <View style={styles.infoIconWrapper}>
-                      {item.lib === 'Material' ? (
-                        <MaterialCommunityIcons name={item.icon} size={20} color="#0df2a6" />
-                      ) : (
-                        <Ionicons name={item.icon} size={20} color="#0df2a6" />
-                      )}
-                    </View>
-                    <View style={styles.infoText}>
-                      <Text style={styles.infoTitle}>{item.title}</Text>
-                      <Text style={styles.infoDesc}>{item.desc}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
+  // ── Active Pledge ─────────────────────────────────────────────────────────
+  if (activePledge) {
+    return (
+      <LinearGradient colors={['#070b18', '#0B1121', '#0f1a2e']} style={styles.fill}>
+        {STARS.map((s) => (
+          <View key={s.id} style={[styles.star, { left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, opacity: s.opacity }]} />
+        ))}
+        <SafeAreaView style={styles.fill}>
+          <View style={styles.screen}>
+            <View style={styles.header}>
+              <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
+                <Ionicons name="close" size={20} color="#fff" />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Taahhüt</Text>
+              <View style={styles.headerBtn} />
             </View>
-          )}
 
-          {/* ── Yeni Taahhüt ── */}
-          {!pledgeComplete && !activePledge && (
-            <>
-              <View style={styles.handContainer}>
-                <MaterialCommunityIcons name="hand-back-left" size={120} color="#d1d5db" />
+            <View style={styles.activeCenter}>
+              <View style={styles.iconWrap}>
+                <MaterialCommunityIcons name="hand-back-left" size={72} color="#d1d5db" />
               </View>
+              <Text style={styles.activeTitleText}>Taahhüt Aktif</Text>
+              <Text style={styles.activeSubText}>Kararlısın. Güçlü kal!</Text>
+              <View style={styles.countdownRow}>
+                <View style={styles.countUnit}>
+                  <Text style={styles.countValue}>{countdown.hours}</Text>
+                  <Text style={styles.countLabel}>saat</Text>
+                </View>
+                <Text style={styles.countSep}>:</Text>
+                <View style={styles.countUnit}>
+                  <Text style={styles.countValue}>{countdown.minutes}</Text>
+                  <Text style={styles.countLabel}>dk</Text>
+                </View>
+                <Text style={styles.countSep}>:</Text>
+                <View style={styles.countUnit}>
+                  <Text style={styles.countValue}>{countdown.seconds}</Text>
+                  <Text style={styles.countLabel}>sn</Text>
+                </View>
+              </View>
+              <Text style={styles.countCaption}>taahhüdünde kalan süre</Text>
+            </View>
 
-              <Text style={styles.pledgeTitle}>Bugün Temizliğe Söz Ver</Text>
-              <Text style={styles.pledgeSubtitle}>
-                Kendinle bir taahhütte bulun. 24 saat sonra bildirim alacaksın ve nasıl gittiğini göreceksin.
-              </Text>
+            <View style={styles.bottomSection}>
+              <TouchableOpacity style={styles.ghostBtn} onPress={() => navigation.goBack()}>
+                <Text style={styles.ghostBtnText}>Ana Sayfaya Dön</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
 
-              <View style={styles.infoCard}>
-                {INFO_ITEMS.map((item, idx) => (
-                  <View
-                    key={item.title}
-                    style={[
-                      styles.infoItem,
-                      idx < INFO_ITEMS.length - 1 && styles.infoItemBorder,
-                    ]}
-                  >
-                    <View style={styles.infoIconWrapper}>
-                      {item.lib === 'Material' ? (
-                        <MaterialCommunityIcons name={item.icon} size={22} color="#e5e7eb" />
-                      ) : (
-                        <Ionicons name={item.icon} size={22} color="#e5e7eb" />
-                      )}
-                    </View>
-                    <View style={styles.infoText}>
-                      <Text style={styles.infoTitle}>{item.title}</Text>
-                      <Text style={styles.infoDesc}>{item.desc}</Text>
-                    </View>
+  // ── New Pledge (main view) ────────────────────────────────────────────────
+  return (
+    <LinearGradient colors={['#070b18', '#0B1121', '#0f1a2e']} style={styles.fill}>
+      {STARS.map((s) => (
+        <View key={s.id} style={[styles.star, { left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, opacity: s.opacity }]} />
+      ))}
+      <SafeAreaView style={styles.fill}>
+        <View style={styles.screen}>
+
+          {/* ── Header ── */}
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="close" size={20} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Taahhüt</Text>
+            <View style={styles.headerBtn} />
+          </View>
+
+          {/* ── Middle ── */}
+          <View style={styles.middle}>
+            <View style={styles.iconWrap}>
+              <MaterialCommunityIcons name="hand-back-left" size={80} color="#d1d5db" />
+            </View>
+            <Text style={styles.mainHeader}>Bugün Söz Ver</Text>
+            <Text style={styles.mainDesc}>
+              Bugün kendine söz ver. 24 saat sonra nasıl geçtiğini kontrol edeceksin.
+            </Text>
+          </View>
+
+          {/* ── Bottom ── */}
+          <View style={styles.bottomSection}>
+            <View style={styles.card}>
+              {INFO_ITEMS.map((item, idx) => (
+                <View
+                  key={item.title}
+                  style={[
+                    styles.cardItem,
+                    idx < INFO_ITEMS.length - 1 && styles.cardItemBorder,
+                  ]}
+                >
+                  <View style={styles.cardIconWrap}>
+                    <Ionicons name={item.icon} size={18} color={PRIMARY} />
                   </View>
-                ))}
-              </View>
-            </>
-          )}
+                  <View style={styles.cardText}>
+                    <Text style={styles.cardTitle}>{item.title}</Text>
+                    <Text style={styles.cardDesc}>{item.desc}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
 
-          {/* Tab bar spacing */}
-          <View style={{ height: 100 }} />
-        </ScrollView>
-
-        {/* Söz Ver Butonu */}
-        {!pledgeComplete && !activePledge && (
-          <View style={styles.btnContainer}>
             <TouchableOpacity
-              style={[styles.pledgeNowBtn, pledging && { opacity: 0.7 }]}
+              style={[styles.primaryBtn, pledging && { opacity: 0.7 }]}
               onPress={handlePledgeNow}
               disabled={pledging}
               activeOpacity={0.85}
             >
-              <Text style={styles.pledgeNowText}>
+              <Text style={styles.primaryBtnText}>
                 {pledging ? 'Kaydediliyor...' : 'Söz Ver'}
               </Text>
             </TouchableOpacity>
           </View>
-        )}
 
-        {/* Ana Sayfaya Dön */}
-        {(activePledge || pledgeComplete) && (
-          <View style={styles.btnContainer}>
-            <TouchableOpacity
-              style={styles.backHomeBtn}
-              onPress={() => navigation.goBack()}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.backHomeBtnText}>Ana Sayfaya Dön</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        </View>
       </SafeAreaView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  safeArea: { flex: 1 },
+  fill: { flex: 1 },
   star: { position: 'absolute', backgroundColor: '#fff', borderRadius: 10 },
+
+  screen: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+  },
+
   centerFill: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: '#9ca3af', fontSize: 16 },
 
+  // ── Header ──
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   headerBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
 
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
+  // ── Middle ──
+  middle: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 8,
   },
-
-  centerContent: {
+  iconWrap: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 16,
-    width: '100%',
+    marginBottom: 20,
   },
-
-  handContainer: {
-    marginBottom: 24,
-    opacity: 0.85,
-  },
-
-  pledgeTitle: {
+  mainHeader: {
     color: '#fff',
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 16,
+    letterSpacing: -0.5,
+    marginBottom: 10,
+  },
+  mainDesc: {
+    color: '#9ca3af',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 8,
+  },
+
+  // ── Bottom Section ──
+  bottomSection: {
+    gap: 14,
+  },
+
+  // ── Card ──
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  cardItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  cardItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  cardIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(13,242,166,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  cardText: { flex: 1 },
+  cardTitle: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  cardDesc: {
+    color: '#6b7280',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
+  // ── Buttons ──
+  primaryBtn: {
+    backgroundColor: '#fff',
+    borderRadius: 999,
+    paddingVertical: 17,
+    alignItems: 'center',
+    shadowColor: '#fff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 4,
+  },
+  primaryBtnText: {
+    color: '#0a0e27',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  ghostBtn: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 999,
+    paddingVertical: 17,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  ghostBtnText: {
+    color: '#9ca3af',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // ── Active Pledge ──
+  activeCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  activeTitleText: {
+    color: PRIMARY,
+    fontSize: 24,
+    fontWeight: '800',
+    marginBottom: 6,
+    letterSpacing: -0.3,
+  },
+  activeSubText: {
+    color: '#9ca3af',
+    fontSize: 14,
+    marginBottom: 28,
+  },
+  countdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  countUnit: {
+    alignItems: 'center',
+    minWidth: 68,
+    backgroundColor: 'rgba(13,242,166,0.07)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(13,242,166,0.18)',
+  },
+  countValue: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  countLabel: {
+    color: '#6b7280',
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  countSep: {
+    color: '#374151',
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
+  countCaption: {
+    color: '#4b5563',
+    fontSize: 12,
+    letterSpacing: 0.3,
+  },
+
+  // ── Complete ──
+  completeCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  completeEmoji: { fontSize: 64, marginBottom: 8 },
+  completeTitle: {
+    color: '#fff',
+    fontSize: 30,
+    fontWeight: '900',
     letterSpacing: -0.5,
   },
-  pledgeSubtitle: {
+  completeSubtitle: {
     color: '#9ca3af',
     fontSize: 15,
     textAlign: 'center',
     lineHeight: 24,
-    marginBottom: 32,
-    paddingHorizontal: 8,
-  },
-
-  infoCard: {
-    width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 18,
-    gap: 14,
-  },
-  infoItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.07)',
-  },
-  infoIconWrapper: { marginTop: 2 },
-  infoText: { flex: 1 },
-  infoTitle: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  infoDesc: {
-    color: '#9ca3af',
-    fontSize: 13,
-    lineHeight: 20,
-  },
-
-  btnContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 96,
-    paddingTop: 8,
-  },
-  pledgeNowBtn: {
-    backgroundColor: '#ffffff',
-    borderRadius: 999,
-    paddingVertical: 18,
-    alignItems: 'center',
-  },
-  pledgeNowText: {
-    color: '#0a0e27',
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  backHomeBtn: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 999,
-    paddingVertical: 18,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  backHomeBtnText: {
-    color: '#9ca3af',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  // Aktif taahhüt geri sayım
-  pledgeActiveTitle: {
-    color: '#0df2a6',
-    fontSize: 28,
-    fontWeight: '800',
-    marginBottom: 8,
-    letterSpacing: -0.5,
-  },
-  pledgeActiveSubtitle: {
-    color: '#9ca3af',
-    fontSize: 15,
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  countdownContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  countdownUnit: {
-    alignItems: 'center',
-    minWidth: 64,
-    backgroundColor: 'rgba(13,242,166,0.08)',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(13,242,166,0.2)',
-  },
-  countdownValue: {
-    color: '#fff',
-    fontSize: 36,
-    fontWeight: '900',
-    letterSpacing: -1,
-  },
-  countdownLabel: {
-    color: '#6b7280',
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  countdownSep: {
-    color: '#4b5563',
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-  countdownCaption: {
-    color: '#6b7280',
-    fontSize: 13,
-    marginBottom: 32,
-    marginTop: 4,
-  },
-
-  // Tamamlandı ekranı
-  completeEmoji: { fontSize: 72, marginBottom: 16 },
-  completeTitle: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '900',
-    marginBottom: 12,
-  },
-  completeSubtitle: {
-    color: '#9ca3af',
-    fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 26,
-    marginBottom: 32,
   },
 });
