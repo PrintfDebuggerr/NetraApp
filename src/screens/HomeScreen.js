@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStreak } from '../contexts/StreakContext';
 import { useAuth } from '../contexts/AuthContext';
 import PanicModal from '../components/PanicModal';
+import StreakOptionsModal from '../components/StreakOptionsModal';
+import DatePickerModal from '../components/DatePickerModal';
 import HeroBadgeCarousel from '../components/HeroBadgeCarousel';
 import { getCurrentBadge, badges } from '../utils/badgeData';
 import { db } from '../../config/firebase';
@@ -53,11 +55,11 @@ function formatPornFreeFor(timer) {
   return `${timer.seconds}sn`;
 }
 
-function ActionButton({ icon, label, onPress }) {
+function ActionButton({ icon, label, onPress, danger }) {
   return (
     <TouchableOpacity style={styles.actionButton} onPress={onPress} activeOpacity={0.75}>
-      <View style={styles.actionIconWrap}>{icon}</View>
-      <Text style={styles.actionLabel}>{label}</Text>
+      <View style={[styles.actionIconWrap, danger && styles.actionIconWrapDanger]}>{icon}</View>
+      <Text style={[styles.actionLabel, danger && styles.actionLabelDanger]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -66,9 +68,10 @@ export default function HomeScreen({ navigation }) {
   const { streakData, timer, brainRewiring, resetStreak, editStreak } = useStreak();
   const { user } = useAuth();
   const [showPanicModal, setShowPanicModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editDays, setEditDays] = useState('');
-  const [editLoading, setEditLoading] = useState(false);
+  const [showStreakOptions, setShowStreakOptions] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [popoverAnchor, setPopoverAnchor] = useState({ cardTop: 0, cardCenterX: 0 });
+  const statsCardRef = useRef(null);
   const [pledgeReason, setPledgeReason] = useState('');
   const [showReasonModal, setShowReasonModal] = useState(false);
   const [editReason, setEditReason] = useState('');
@@ -101,21 +104,15 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const handleEditStreak = async () => {
-    const days = parseInt(editDays, 10);
-    if (isNaN(days) || days < 0) {
-      Alert.alert('Geçersiz Giriş', '0 veya daha fazla geçerli bir gün sayısı girin.');
-      return;
-    }
-    setEditLoading(true);
+  const handleDateSave = async (date) => {
     try {
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const days = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
       await editStreak(days);
-      setShowEditModal(false);
-      setEditDays('');
     } catch {
       Alert.alert('Hata', 'Streak güncellenemedi. Tekrar dene.');
     }
-    setEditLoading(false);
   };
 
   return (
@@ -160,17 +157,23 @@ export default function HomeScreen({ navigation }) {
             currentStreak={currentStreak}
             currentBadge={currentBadge}
             onNavigateToAll={() => navigation.navigate('Achievements')}
-            onLongPress={() => {
-              setEditDays(String(currentStreak));
-              setShowEditModal(true);
-            }}
           />
 
           {/* ── Motto under badge ── */}
           <Text style={styles.mottoText}>Ya bir gün, ya bugün.</Text>
 
           {/* ── Stats Row ── */}
-          <View style={styles.statsRow}>
+          <TouchableOpacity
+            ref={statsCardRef}
+            style={styles.statsRow}
+            onPress={() => {
+              statsCardRef.current?.measureInWindow((x, y, width, height) => {
+                setPopoverAnchor({ cardTop: y, cardCenterX: x + width / 2 });
+                setShowStreakOptions(true);
+              });
+            }}
+            activeOpacity={0.75}
+          >
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Nüks</Text>
               <Text style={styles.statValue}>{streakData?.relapses || 0}</Text>
@@ -185,22 +188,23 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.statLabel}>Hedef</Text>
               <Text style={styles.statValue}>{tilSober}g</Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* ── Action Buttons ── */}
           <View style={styles.actionsRow}>
             <ActionButton
-              icon={<MaterialCommunityIcons name="hand-back-left" size={24} color="#a78bfa" />}
+              icon={<MaterialCommunityIcons name="hand-back-left" size={26} color="#a78bfa" />}
               label="Söz Ver"
               onPress={() => navigation.navigate('Pledge')}
             />
             <ActionButton
-              icon={<MaterialCommunityIcons name="meditation" size={24} color="#60a5fa" />}
+              icon={<MaterialCommunityIcons name="meditation" size={26} color="#60a5fa" />}
               label="Meditasyon"
               onPress={() => navigation.navigate('Meditation')}
             />
             <ActionButton
-              icon={<Ionicons name="refresh-circle" size={26} color="#f87171" />}
+              danger
+              icon={<Ionicons name="refresh-circle" size={28} color="#f87171" />}
               label="Sıfırla"
               onPress={() =>
                 Alert.alert(
@@ -212,11 +216,6 @@ export default function HomeScreen({ navigation }) {
                   ]
                 )
               }
-            />
-            <ActionButton
-              icon={<Ionicons name="person" size={24} color="#c084fc" />}
-              label="Melius"
-              onPress={() => Alert.alert('Yakında', 'AI Terapist özelliği çok yakında geliyor.')}
             />
           </View>
 
@@ -317,49 +316,36 @@ export default function HomeScreen({ navigation }) {
         {/* ── Modals ── */}
         <PanicModal visible={showPanicModal} onClose={() => setShowPanicModal(false)} />
 
-        {/* Streak Düzenle Modal */}
-        <Modal
-          visible={showEditModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowEditModal(false)}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.modalOverlay}
-          >
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Streak Düzenle</Text>
-              <Text style={styles.modalSubtitle}>
-                Streak'in yanlışsa düzelt. Gerçek gün sayısını gir.
-              </Text>
-              <TextInput
-                style={styles.modalInput}
-                value={editDays}
-                onChangeText={setEditDays}
-                keyboardType="number-pad"
-                placeholder="Gün"
-                placeholderTextColor="#6b7280"
-                maxLength={4}
-              />
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.modalCancelBtn}
-                  onPress={() => setShowEditModal(false)}
-                >
-                  <Text style={styles.modalCancelText}>Vazgeç</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalConfirmBtn, editLoading && { opacity: 0.6 }]}
-                  onPress={handleEditStreak}
-                  disabled={editLoading}
-                >
-                  <Text style={styles.modalConfirmText}>{editLoading ? 'Kaydediliyor...' : 'Kaydet'}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
+        <StreakOptionsModal
+          visible={showStreakOptions}
+          anchorCardTop={popoverAnchor.cardTop}
+          anchorCenterX={popoverAnchor.cardCenterX}
+          onClose={() => setShowStreakOptions(false)}
+          onEditStartDate={() => setShowDatePicker(true)}
+          onReset={() =>
+            Alert.alert(
+              'Seriyi Sıfırla',
+              "Serini sıfırlamak istediğinden emin misin? Bu bir nüks olarak kaydedilecek.\n\nYa bir gün, ya bugün.",
+              [
+                { text: 'Vazgeç', style: 'cancel' },
+                { text: 'Sıfırla', style: 'destructive', onPress: resetStreak },
+              ]
+            )
+          }
+        />
+
+        <DatePickerModal
+          visible={showDatePicker}
+          initialDate={
+            streakData?.startDate
+              ? (streakData.startDate instanceof Date
+                  ? streakData.startDate
+                  : streakData.startDate.toDate?.() || new Date(streakData.startDate))
+              : new Date()
+          }
+          onClose={() => setShowDatePicker(false)}
+          onSave={handleDateSave}
+        />
 
         {/* Neden Bırakıyorum Modal */}
         <Modal
@@ -574,15 +560,16 @@ const styles = StyleSheet.create({
   // Action Buttons
   actionsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    gap: 28,
     marginBottom: 24,
-    paddingHorizontal: 4,
   },
-  actionButton: { alignItems: 'center', gap: 8 },
+  actionButton: { alignItems: 'center', gap: 9 },
   actionIconWrap: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: 'rgba(13,242,166,0.06)',
     borderWidth: 1,
     borderColor: 'rgba(13,242,166,0.15)',
@@ -594,10 +581,17 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  actionIconWrapDanger: {
+    backgroundColor: 'rgba(248,113,113,0.07)',
+    borderColor: 'rgba(248,113,113,0.2)',
+  },
   actionLabel: {
     color: '#9ca3af',
     fontSize: 11,
     fontWeight: '500',
+  },
+  actionLabelDanger: {
+    color: 'rgba(248,113,113,0.7)',
   },
 
   // Horizontal Achievements

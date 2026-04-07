@@ -21,7 +21,8 @@
         {
           "cameraPermission": "Panik butonu özelliği için kameraya erişim gerekiyor."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",
