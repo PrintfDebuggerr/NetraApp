@@ -96,7 +96,6 @@ function SettingsItem({ icon, iconBgColor, title, subtitle, hasToggle, toggleVal
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
   const { streakData } = useStreak();
-  const [internetFilter, setInternetFilter] = useState(true);
 
   const handleLogout = async () => {
     await logout();
@@ -297,16 +296,6 @@ export default function ProfileScreen({ navigation }) {
 
           {/* Settings List */}
           <View style={styles.settingsList}>
-            <SettingsItem
-              icon={<Ionicons name="shield-checkmark" size={20} color="#60a5fa" />}
-              iconBgColor="rgba(59, 130, 246, 0.1)"
-              title="İnternet Filtresi"
-              subtitle="Uygunsuz içerikleri engelle"
-              hasToggle={true}
-              toggleValue={internetFilter}
-              onToggle={setInternetFilter}
-            />
-            <View style={styles.settingsDivider} />
             <SettingsItem
               icon={<Ionicons name="options" size={20} color="#d1d5db" />}
               iconBgColor="rgba(107, 114, 128, 0.1)"
