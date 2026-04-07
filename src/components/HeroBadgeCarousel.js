@@ -14,28 +14,26 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getBadgeTheme } from '../utils/badgeThemes';
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
-const { width: SCREEN_W } = Dimensions.get('window');
+const SCREEN_W = Dimensions.get('window').width;
 
-// Layout constants
-const PEEK = 42;                        // visible strip of neighboring badge
-const SLIDE_W = SCREEN_W - 2 * PEEK;   // each pager slide width
+// ── Layout ────────────────────────────────────────────────────────────────
+// Item is 56% of screen → 22% of screen visible on each side, giving
+// clearly readable previous/next badges without clipping tricks.
+const ITEM_W       = SCREEN_W * 0.56;
+const SIDE_SPACING = (SCREEN_W - ITEM_W) / 2;
 
-// Badge visual sizes — reduced for compactness
-const CONTAINER_SZ = 210;
-const RING_SZ = 156;
-const GLOW_OUTER_SZ = 210;
-const GLOW_INNER_SZ = 176;
-const PULSE_SZ = 172;
-const ICON_SZ = 52;
+// Badge visual sizes
+const RING_SZ       = 140;
+const CONTAINER_SZ  = RING_SZ + 48;   // room for glow + pulse ring
+const ICON_SZ       = 46;
 
 const STORAGE_KEY = '@badge_carousel_last_index';
-
-const PRIMARY = '#0df2a6';
+const PRIMARY     = '#0df2a6';
 const LOCKED_GRAD = ['#1a2035', '#252d3d'];
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 // Individual badge slide
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 const BadgeSlide = React.memo(function BadgeSlide({
   badge,
   index,
@@ -49,28 +47,28 @@ const BadgeSlide = React.memo(function BadgeSlide({
   const isEarned = badge.requiredDays <= currentStreak;
   const daysLeft = Math.max(0, badge.requiredDays - currentStreak);
 
-  // Scroll-driven scale + fade
+  // inputRange aligned to ITEM_W so interpolations track correctly
+  const inputRange = [
+    (index - 1) * ITEM_W,
+    index       * ITEM_W,
+    (index + 1) * ITEM_W,
+  ];
+
   const scale = useMemo(
-    () =>
-      scrollX.interpolate({
-        inputRange: [(index - 1) * SLIDE_W, index * SLIDE_W, (index + 1) * SLIDE_W],
-        outputRange: [0.78, 1.0, 0.78],
-        extrapolate: 'clamp',
-      }),
+    () => scrollX.interpolate({ inputRange, outputRange: [0.78, 1, 0.78], extrapolate: 'clamp' }),
     [scrollX, index]
   );
-  const fadeOpacity = useMemo(
-    () =>
-      scrollX.interpolate({
-        inputRange: [(index - 1) * SLIDE_W, index * SLIDE_W, (index + 1) * SLIDE_W],
-        outputRange: [0.28, 1.0, 0.28],
-        extrapolate: 'clamp',
-      }),
+  const opacity = useMemo(
+    () => scrollX.interpolate({ inputRange, outputRange: [0.55, 1, 0.55], extrapolate: 'clamp' }),
+    [scrollX, index]
+  );
+  const translateY = useMemo(
+    () => scrollX.interpolate({ inputRange, outputRange: [8, 0, 8], extrapolate: 'clamp' }),
     [scrollX, index]
   );
 
-  // Independent pulse ring for the "next" badge
-  const pulseScale = useRef(new Animated.Value(1)).current;
+  // Pulse ring for the "next to unlock" badge
+  const pulseScale   = useRef(new Animated.Value(1)).current;
   const pulseOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -82,124 +80,113 @@ const BadgeSlide = React.memo(function BadgeSlide({
     const loop = Animated.loop(
       Animated.sequence([
         Animated.parallel([
-          Animated.timing(pulseScale, { toValue: 1.13, duration: 1100, useNativeDriver: true }),
-          Animated.timing(pulseOpacity, { toValue: 0.5, duration: 550, useNativeDriver: true }),
+          Animated.timing(pulseScale,   { toValue: 1.13, duration: 1100, useNativeDriver: true }),
+          Animated.timing(pulseOpacity, { toValue: 0.5,  duration: 550,  useNativeDriver: true }),
         ]),
         Animated.parallel([
-          Animated.timing(pulseScale, { toValue: 1, duration: 850, useNativeDriver: true }),
+          Animated.timing(pulseScale,   { toValue: 1, duration: 850, useNativeDriver: true }),
           Animated.timing(pulseOpacity, { toValue: 0, duration: 850, useNativeDriver: true }),
         ]),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [isNext, pulseScale, pulseOpacity]);
+  }, [isNext]);
 
-  const theme = getBadgeTheme(badge.id, isEarned);
+  const theme      = getBadgeTheme(badge.id, isEarned);
   const ringColors = isEarned ? [theme.ringColor, theme.iconColor + '90'] : LOCKED_GRAD;
-  const innerBg = theme.innerBg;
-  const iconColor = theme.iconColor;
 
   let statusText, statusStyleKey;
   if (isCurrent) {
-    statusText = `${currentStreak} gün`;
+    statusText     = `${currentStreak} gün`;
     statusStyleKey = 'statusCurrent';
   } else if (isEarned) {
-    statusText = `Kazanıldı  ·  ${badge.requiredDays} gün`;
+    statusText     = `Kazanıldı  ·  ${badge.requiredDays} gün`;
     statusStyleKey = 'statusEarned';
   } else {
-    statusText = `${badge.requiredDays} günde açılır`;
+    statusText     = `${badge.requiredDays} günde açılır`;
     statusStyleKey = 'statusLocked';
   }
 
   return (
-    <Animated.View style={[styles.slideOuter, { opacity: fadeOpacity, transform: [{ scale }] }]}>
-      <View style={styles.slide}>
+    <Animated.View
+      style={[
+        styles.itemOuter,
+        { opacity, transform: [{ scale }, { translateY }] },
+      ]}
+    >
+      {/* Badge ring */}
+      <View style={styles.ringContainer}>
+        {/* Outer glow blob */}
+        <View
+          style={[
+            styles.glowOuter,
+            isCurrent && isEarned && { backgroundColor: theme.outerGlow },
+          ]}
+        />
 
-        {/* Ring container */}
-        <View style={styles.ringContainer}>
+        {/* Pulse ring (next badge only) */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.pulseRing,
+            {
+              borderColor: isEarned ? theme.iconColor : '#1e2a3a',
+              transform: [{ scale: pulseScale }],
+              opacity: pulseOpacity,
+            },
+          ]}
+        />
 
-          <View
+        <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={0.88}>
+          <LinearGradient
+            colors={ringColors}
             style={[
-              styles.glowOuter,
-              isCurrent && isEarned && { backgroundColor: theme.outerGlow },
-            ]}
-          />
-          <View
-            style={[
-              styles.glowInner,
-              isCurrent && isEarned && { backgroundColor: theme.outerGlow },
-            ]}
-          />
-
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.pulseRing,
-              {
-                borderColor: isEarned ? theme.iconColor : '#1e2a3a',
-                transform: [{ scale: pulseScale }],
-                opacity: pulseOpacity,
+              styles.badgeRing,
+              isCurrent && isEarned && {
+                shadowColor:   theme.iconColor,
+                shadowOffset:  { width: 0, height: 0 },
+                shadowOpacity: 0.8,
+                shadowRadius:  28,
+                elevation:     14,
               },
+              !isEarned && { opacity: 0.5 },
             ]}
-          />
-
-          <TouchableOpacity
-            onPress={onPress}
-            onLongPress={onLongPress}
-            activeOpacity={0.88}
-            style={styles.ringWrap}
           >
-            <LinearGradient
-              colors={ringColors}
-              style={[
-                styles.badgeRing,
-                isCurrent && isEarned && {
-                  shadowColor: theme.iconColor,
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.75,
-                  shadowRadius: 28,
-                  elevation: 14,
-                },
-                !isEarned && { opacity: 0.55 },
-              ]}
-            >
-              <View style={[styles.badgeInner, { backgroundColor: innerBg }]}>
-                <View style={styles.badgeShine} />
-                {!isEarned ? (
-                  <Ionicons name="lock-closed" size={28} color={iconColor} />
-                ) : badge.iconType === 'material' ? (
-                  <MaterialCommunityIcons name={badge.icon} size={ICON_SZ} color={iconColor} />
-                ) : (
-                  <Ionicons name={badge.icon} size={ICON_SZ} color={iconColor} />
-                )}
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* Text area */}
-        <Text style={[styles.badgeName, !isEarned && styles.badgeNameDim]}>
-          {badge.name}
-        </Text>
-
-        <Text style={[styles.badgeStatus, styles[statusStyleKey]]}>
-          {statusText}
-        </Text>
-
-        {isNext && !isEarned && daysLeft > 0 && (
-          <View style={styles.nextHintPill}>
-            <Text style={styles.nextHintText}>{daysLeft} gün kaldı</Text>
-          </View>
-        )}
+            <View style={[styles.badgeInner, { backgroundColor: theme.innerBg }]}>
+              <View style={styles.badgeShine} />
+              {!isEarned ? (
+                <Ionicons name="lock-closed" size={26} color={theme.iconColor} />
+              ) : badge.iconType === 'material' ? (
+                <MaterialCommunityIcons name={badge.icon} size={ICON_SZ} color={theme.iconColor} />
+              ) : (
+                <Ionicons name={badge.icon} size={ICON_SZ} color={theme.iconColor} />
+              )}
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
+
+      {/* Label */}
+      <Text style={[styles.badgeName, !isEarned && styles.badgeNameDim]}>
+        {badge.name}
+      </Text>
+      <Text style={[styles.badgeStatus, styles[statusStyleKey]]}>
+        {statusText}
+      </Text>
+
+      {isNext && !isEarned && daysLeft > 0 && (
+        <View style={styles.nextHintPill}>
+          <Text style={styles.nextHintText}>{daysLeft} gün kaldı</Text>
+        </View>
+      )}
     </Animated.View>
   );
 });
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 // Main export
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 export default function HeroBadgeCarousel({
   badges,
   currentStreak,
@@ -209,20 +196,19 @@ export default function HeroBadgeCarousel({
 }) {
   const listRef = useRef(null);
 
-  const hasCurrent = currentBadge?.id !== undefined;
+  const hasCurrent  = currentBadge?.id !== undefined;
   const currentIndex = hasCurrent
     ? Math.max(0, badges.findIndex((b) => b.id === currentBadge.id))
-    : -1;
+    : 0;
 
   const nextBadge = badges
     .filter((b) => b.requiredDays > currentStreak)
     .sort((a, b) => a.requiredDays - b.requiredDays)[0];
   const nextIndex = nextBadge ? badges.findIndex((b) => b.id === nextBadge.id) : -1;
 
-  const defaultIndex = hasCurrent ? currentIndex : Math.max(0, nextIndex);
-  const scrollX = useRef(new Animated.Value(defaultIndex * SLIDE_W)).current;
+  // initialise scrollX to the current badge offset so first render is correct
+  const scrollX = useRef(new Animated.Value(currentIndex * ITEM_W)).current;
 
-  // Load last-viewed index from AsyncStorage and snap to it
   useEffect(() => {
     (async () => {
       try {
@@ -230,25 +216,29 @@ export default function HeroBadgeCarousel({
         if (saved !== null) {
           const idx = parseInt(saved, 10);
           if (!isNaN(idx) && idx >= 0 && idx < badges.length) {
-            listRef.current?.scrollToOffset({ offset: idx * SLIDE_W, animated: false });
-            scrollX.setValue(idx * SLIDE_W);
+            listRef.current?.scrollToIndex({ index: idx, animated: false });
+            scrollX.setValue(idx * ITEM_W);
             return;
           }
         }
       } catch {}
-      // Fallback: scroll to current badge
-      if (defaultIndex > 0) {
-        listRef.current?.scrollToOffset({ offset: defaultIndex * SLIDE_W, animated: false });
+      // Fallback: jump to current badge
+      if (currentIndex > 0) {
+        listRef.current?.scrollToIndex({ index: currentIndex, animated: false });
+        scrollX.setValue(currentIndex * ITEM_W);
       }
     })();
   }, []);
 
-  // Persist last-viewed index when swipe settles
-  const handleMomentumScrollEnd = useCallback((event) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const idx = Math.round(offsetX / SLIDE_W);
+  const handleMomentumScrollEnd = useCallback((e) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / ITEM_W);
     AsyncStorage.setItem(STORAGE_KEY, String(idx)).catch(() => {});
   }, []);
+
+  const getItemLayout = useCallback(
+    (_, index) => ({ length: ITEM_W, offset: ITEM_W * index, index }),
+    []
+  );
 
   const renderItem = useCallback(
     ({ item, index }) => (
@@ -267,6 +257,8 @@ export default function HeroBadgeCarousel({
   );
 
   return (
+    // marginHorizontal:-20 cancels the parent ScrollView's paddingHorizontal:20
+    // so the FlatList spans the full screen width
     <View style={styles.container}>
       <AnimatedFlatList
         ref={listRef}
@@ -275,90 +267,73 @@ export default function HeroBadgeCarousel({
         renderItem={renderItem}
         horizontal
         showsHorizontalScrollIndicator={false}
-        snapToInterval={SLIDE_W}
-        decelerationRate="fast"
+        snapToInterval={ITEM_W}
         snapToAlignment="start"
-        contentContainerStyle={styles.listContent}
+        decelerationRate="fast"
+        bounces={false}
+        getItemLayout={getItemLayout}
+        // padding ensures first item is centered; side items overflow naturally
+        contentContainerStyle={{ paddingHorizontal: SIDE_SPACING }}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           { useNativeDriver: true }
         )}
         scrollEventThrottle={16}
         onMomentumScrollEnd={handleMomentumScrollEnd}
-        style={styles.list}
       />
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 // Styles
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  // Full-width wrapper that breaks out of parent horizontal padding
   container: {
     marginHorizontal: -20,
     marginBottom: 10,
   },
-  list: {
-    overflow: 'visible',
-  },
-  listContent: {
-    paddingHorizontal: PEEK,
-  },
 
-  slideOuter: {
-    width: SLIDE_W,
-  },
-  slide: {
-    width: SLIDE_W,
+  // Each slide is exactly ITEM_W wide — narrower than screen by design
+  itemOuter: {
+    width: ITEM_W,
     alignItems: 'center',
     paddingTop: 8,
-    paddingBottom: 10,
+    paddingBottom: 12,
   },
 
-  // Ring container
+  // Badge ring area
   ringContainer: {
     width: CONTAINER_SZ,
     height: CONTAINER_SZ,
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   glowOuter: {
     position: 'absolute',
-    width: GLOW_OUTER_SZ,
-    height: GLOW_OUTER_SZ,
-    borderRadius: GLOW_OUTER_SZ / 2,
-    top: 0,
-    left: 0,
+    width: CONTAINER_SZ,
+    height: CONTAINER_SZ,
+    borderRadius: CONTAINER_SZ / 2,
     backgroundColor: 'transparent',
   },
-  glowInner: {
-    position: 'absolute',
-    width: GLOW_INNER_SZ,
-    height: GLOW_INNER_SZ,
-    borderRadius: GLOW_INNER_SZ / 2,
-    top: (CONTAINER_SZ - GLOW_INNER_SZ) / 2,
-    left: (CONTAINER_SZ - GLOW_INNER_SZ) / 2,
-    backgroundColor: 'transparent',
-  },
-
   pulseRing: {
     position: 'absolute',
-    width: PULSE_SZ,
-    height: PULSE_SZ,
-    borderRadius: PULSE_SZ / 2,
+    width: RING_SZ + 16,
+    height: RING_SZ + 16,
+    borderRadius: (RING_SZ + 16) / 2,
     borderWidth: 2,
-    top: (CONTAINER_SZ - PULSE_SZ) / 2,
-    left: (CONTAINER_SZ - PULSE_SZ) / 2,
   },
-
-  ringWrap: {},
   badgeRing: {
     width: RING_SZ,
     height: RING_SZ,
     borderRadius: RING_SZ / 2,
     padding: 5,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.6,
+    shadowRadius: 18,
   },
   badgeInner: {
     flex: 1,
@@ -367,23 +342,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.07)',
   },
   badgeShine: {
     position: 'absolute',
-    top: -44,
-    left: -44,
-    width: 110,
-    height: 110,
+    top: -40,
+    left: -40,
+    width: 100,
+    height: 100,
     backgroundColor: 'rgba(255,255,255,0.09)',
-    borderRadius: 55,
+    borderRadius: 50,
     transform: [{ rotate: '45deg' }],
   },
 
   // Text
   badgeName: {
     color: '#ffffff',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 10,
@@ -393,21 +368,15 @@ const styles = StyleSheet.create({
     color: '#4b5563',
   },
   badgeStatus: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
-    marginTop: 4,
+    marginTop: 3,
     textAlign: 'center',
   },
-  statusCurrent: {
-    color: '#9ca3af',
-  },
-  statusEarned: {
-    color: PRIMARY,
-    fontWeight: '600',
-  },
-  statusLocked: {
-    color: '#374151',
-  },
+  statusCurrent: { color: '#9ca3af' },
+  statusEarned:  { color: PRIMARY, fontWeight: '600' },
+  statusLocked:  { color: '#374151' },
+
   nextHintPill: {
     marginTop: 8,
     backgroundColor: 'rgba(251,191,36,0.1)',
