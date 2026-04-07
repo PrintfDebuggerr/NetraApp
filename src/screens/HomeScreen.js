@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import { JOURNAL_STORAGE_KEY } from './AddJournalScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStreak } from '../contexts/StreakContext';
@@ -75,6 +78,7 @@ export default function HomeScreen({ navigation }) {
   const [pledgeReason, setPledgeReason] = useState('');
   const [showReasonModal, setShowReasonModal] = useState(false);
   const [editReason, setEditReason] = useState('');
+  const [journalEntries, setJournalEntries] = useState([]);
 
   const currentStreak = streakData?.currentStreak || 0;
   const currentBadge = getCurrentBadge(currentStreak);
@@ -92,6 +96,37 @@ export default function HomeScreen({ navigation }) {
       } catch {}
     })();
   }, [user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      async function loadJournalEntries() {
+        try {
+          const raw = await AsyncStorage.getItem(JOURNAL_STORAGE_KEY);
+          setJournalEntries(raw ? JSON.parse(raw) : []);
+        } catch {}
+      }
+      loadJournalEntries();
+    }, [])
+  );
+
+  const handleDeleteJournalEntry = (id) => {
+    Alert.alert('Günlüğü Sil', 'Bu kaydı silmek istediğinden emin misin?', [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Sil',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const raw = await AsyncStorage.getItem(JOURNAL_STORAGE_KEY);
+            const entries = raw ? JSON.parse(raw) : [];
+            const updated = entries.filter((e) => e.id !== id);
+            await AsyncStorage.setItem(JOURNAL_STORAGE_KEY, JSON.stringify(updated));
+            setJournalEntries(updated);
+          } catch {}
+        },
+      },
+    ]);
+  };
 
   const handleSaveReason = async () => {
     if (!user) return;
@@ -240,32 +275,51 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.quoteCloseMark}>{'\u201D\u201D'}</Text>
           </View>
 
-          {/* ── Engellenen Siteler Stub ── */}
-          <TouchableOpacity
-            style={styles.listCard}
-            activeOpacity={0.75}
-            onPress={() => Alert.alert('Yakında', 'Site engelleme özelliği çok yakında geliyor.')}
-          >
-            <View style={styles.listCardLeft}>
-              <View style={styles.listCardIconRed}>
-                <Ionicons name="ban" size={22} color="#ef4444" />
-              </View>
-              <View>
-                <Text style={styles.listCardTitle}>Engellenen Siteler</Text>
-                <Text style={styles.listCardSub}>Engellemek istediklerini seç</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
-          </TouchableOpacity>
-
           {/* ── Günlük ── */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Günlük</Text>
           </View>
+
+          {journalEntries.length === 0 ? (
+            <Text style={styles.journalEmptyText}>Henüz günlük eklenmedi</Text>
+          ) : (
+            <View style={styles.journalList}>
+              {journalEntries.map((entry) => (
+                <View key={entry.id} style={styles.journalItem}>
+                  <View style={styles.journalAccent} />
+                  <View style={styles.journalItemBody}>
+                    <Text style={styles.journalItemTitle} numberOfLines={1}>
+                      {entry.title || 'İsimsiz Not'}
+                    </Text>
+                    {!!entry.content && (
+                      <Text style={styles.journalItemPreview} numberOfLines={2}>
+                        {entry.content}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.journalItemActions}>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('AddJournal', { entry })}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+                    >
+                      <Ionicons name="pencil-outline" size={17} color="#9ca3af" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteJournalEntry(entry.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                    >
+                      <Ionicons name="trash-outline" size={17} color="rgba(248,113,113,0.7)" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
           <TouchableOpacity
             style={styles.addNewBtn}
             activeOpacity={0.8}
-            onPress={() => Alert.alert('Yakında', 'Günlük özelliği çok yakında geliyor.')}
+            onPress={() => navigation.navigate('AddJournal')}
           >
             <Ionicons name="add-circle" size={20} color="#fff" />
             <Text style={styles.addNewText}>Yeni Ekle</Text>
@@ -399,7 +453,7 @@ const styles = StyleSheet.create({
   gradient: { flex: 1 },
   star: { position: 'absolute', backgroundColor: '#fff', borderRadius: 10 },
   scrollView: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingTop: 52 },
+  content: { paddingHorizontal: 20, paddingTop: 52, paddingBottom: 110 },
 
   // Header
   header: {
@@ -772,6 +826,58 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  journalEmptyText: {
+    color: 'rgba(255,255,255,0.25)',
+    fontSize: 13,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  journalList: {
+    gap: 8,
+    marginBottom: 14,
+  },
+  journalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 12,
+    paddingRight: 14,
+    overflow: 'hidden',
+  },
+  journalAccent: {
+    width: 3,
+    alignSelf: 'stretch',
+    backgroundColor: '#0df2a6',
+    borderRadius: 2,
+    marginLeft: 12,
+    marginRight: 12,
+    opacity: 0.7,
+  },
+  journalItemBody: {
+    flex: 1,
+    gap: 3,
+  },
+  journalItemTitle: {
+    color: '#f3f4f6',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
+  journalItemPreview: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  journalItemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginLeft: 12,
+  },
   addNewBtn: {
     backgroundColor: 'rgba(13,242,166,0.1)',
     borderRadius: 14,
@@ -849,7 +955,7 @@ const styles = StyleSheet.create({
   // Sticky Panic Button
   stickyPanicButton: {
     position: 'absolute',
-    bottom: 88,
+    bottom: 108,
     left: 20,
     right: 20,
     backgroundColor: '#dc2626',
